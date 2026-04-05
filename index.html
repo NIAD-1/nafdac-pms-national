@@ -61,16 +61,19 @@
   </div>
 
   <!-- ═══ Authenticated App ═══ -->
-  <div id="authenticatedApp" class="hidden" style="display:none;">
+  <div id="authenticatedApp" class="hidden" style="display: flex;">
     
     <!-- Mobile Header (Visible < 1024px) -->
-    <div id="mobileHeader" class="mobile-only" style="display:none; position:fixed; top:0; left:0; width:100%; height:60px; background:var(--bg-sidebar); z-index:1001; padding:0 16px; align-items:center; justify-content:space-between; box-shadow:0 2px 8px rgba(0,0,0,0.2);">
-      <div style="display:flex; align-items:center; gap:12px;">
+    <div id="mobileHeader" class="mobile-only" style="display: none; position:fixed; top:0; left:0; width:100%; height:60px; background:var(--bg-sidebar); z-index:1001; padding:0 16px; align-items:center; justify-content:space-between; box-shadow:0 2px 8px rgba(0,0,0,0.2);">
+        <div style="display:flex; align-items:center; gap:12px;">
+            <img src="./assets/nafdac-logo.png" style="height:32px; width:32px; background:white; padding:4px; border-radius:50%;" alt="Logo">
+            <span style="color:white; font-weight:700; letter-spacing:1px; font-size:14px;">PMS PORTAL</span>
+        </div>
         <button id="sidebarToggle" style="background:transparent; padding:8px; border:none; font-size:24px; color:white; cursor:pointer;">☰</button>
-        <div style="color:white; font-weight:800; font-size:14px; letter-spacing:1px; text-transform:uppercase;">NAFDAC PMS</div>
-      </div>
-      <img src="logo.png" style="height:32px; width:32px; background:white; border-radius:50%; padding:4px;">
     </div>
+
+    <!-- Mobile Sidebar Overlay -->
+    <div id="sidebarOverlay" class="sidebar-overlay"></div>
 
     <header id="sidebar">
       <div class="logo-container">

@@ -43,6 +43,12 @@ async function navigate(page) {
         btn.classList.toggle('active', btn.dataset.target === page);
     });
 
+    // Auto-close mobile sidebar
+    const _sidebar = document.getElementById('sidebar');
+    const _overlay = document.getElementById('sidebarOverlay');
+    if (_sidebar) _sidebar.classList.remove('open');
+    if (_overlay) _overlay.classList.remove('active');
+
     switch (page) {
         case 'home':
             await renderHomePage();
@@ -266,8 +272,21 @@ document.getElementById('btnSignOut').onclick = logOut;
 // Mobile Sidebar Toggle
 const sidebar = document.getElementById('sidebar');
 const toggle = document.getElementById('sidebarToggle');
+const overlay = document.getElementById('sidebarOverlay');
+
+function closeSidebar() {
+    if (sidebar) sidebar.classList.remove('open');
+    if (overlay) overlay.classList.remove('active');
+}
+
 if (toggle && sidebar) {
-    toggle.onclick = () => sidebar.classList.toggle('open');
+    toggle.onclick = () => {
+        sidebar.classList.toggle('open');
+        if (overlay) overlay.classList.toggle('active');
+    };
+}
+if (overlay) {
+    overlay.onclick = closeSidebar;
 }
 
 // Screen references
