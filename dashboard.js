@@ -87,14 +87,14 @@ function renderDashboardUI(root, userData) {
         <option value="log-meetings">Meetings & QMS</option>
     `;
 
+    const scope = getUserScope();
+
     let dashboardStateList = ALL_STATES;
     if (scope.zone && !scope.state) {
         dashboardStateList = ZONES[scope.zone] || ALL_STATES;
     }
     const stateOptions = dashboardStateList.map(s => `<option value="${s}">${s}</option>`).join('');
     const zoneOptions = Object.keys(ZONES).map(z => `<option value="${z}">${z}</option>`).join('');
-
-    const scope = getUserScope();
 
     root.innerHTML = `
     <div class="animate-fade-in">
