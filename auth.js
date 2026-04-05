@@ -66,6 +66,9 @@ async function createNewUserProfile(dbInstance, user) {
             };
             await setDoc(userRef, currentUserData);
             console.log("[Auth] ✅ New user profile created in Firestore:", user.email);
+
+            // 📧 Notify Admin via EmailJS (fire-and-forget)
+            notifyAdminNewUser(user.displayName || user.email, user.email);
         } else {
             currentUserData = { ...docSnap.data(), uid: user.uid };
         }
@@ -138,5 +141,39 @@ export async function logOut() {
         await signOut(auth);
     } catch (error) {
         console.error("Error signing out:", error);
+    }
+}
+
+// ── ADMIN EMAIL NOTIFICATION (EmailJS) ─────────────────────────
+// Setup: 1. Go to https://www.emailjs.com and create a free account
+//        2. Create a Service (connect your Gmail)
+//        3. Create an Email Template with variables: {{user_name}}, {{user_email}}, {{time}}
+//        4. Replace the 3 values below with your own
+const EMAILJS_SERVICE_ID  = 'YOUR_SERVICE_ID';   // e.g. 'service_abc123'
+const EMAILJS_TEMPLATE_ID = 'YOUR_TEMPLATE_ID';  // e.g. 'template_xyz789'
+const EMAILJS_PUBLIC_KEY   = 'YOUR_PUBLIC_KEY';   // e.g. 'abcDEF123ghiJKL'
+
+async function notifyAdminNewUser(name, email) {
+    if (EMAILJS_SERVICE_ID === 'YOUR_SERVICE_ID') {
+        console.log("[Notify] EmailJS not configured. Skipping admin email notification.");
+        return;
+    }
+    try {
+        // Load EmailJS SDK dynamically (no install needed)
+        if (!window.emailjs) {
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js';
+            document.head.appendChild(script);
+            await new Promise(r => script.onload = r);
+        }
+        window.emailjs.init(EMAILJS_PUBLIC_KEY);
+        await window.emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+            user_name: name,
+            user_email: email,
+            time: new Date().toLocaleString()
+        });
+        console.log("[Notify] 📧 Admin notified of new user:", email);
+    } catch (err) {
+        console.warn("[Notify] Email notification failed (non-critical):", err);
     }
 }

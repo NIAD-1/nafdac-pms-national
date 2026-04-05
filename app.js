@@ -270,38 +270,94 @@ if (toggle && sidebar) {
     toggle.onclick = () => sidebar.classList.toggle('open');
 }
 
+// Screen references
+const waitingRoom = document.getElementById('waitingRoom');
+
+function showScreen(screen) {
+    loginScreen.style.display = 'none';
+    authenticatedApp.style.display = 'none';
+    waitingRoom.style.display = 'none';
+    loginScreen.classList.add('hidden');
+    authenticatedApp.classList.add('hidden');
+
+    if (screen === 'login') {
+        loginScreen.style.display = 'flex';
+        loginScreen.classList.remove('hidden');
+    } else if (screen === 'waiting') {
+        waitingRoom.style.display = 'flex';
+    } else if (screen === 'app') {
+        authenticatedApp.style.display = 'flex';
+        authenticatedApp.classList.remove('hidden');
+    }
+}
+
 // ── AUTH LIFECYCLE ──────────────────────────────────────────────
 initAuth(db, (user, userData) => {
     if (user && userData) {
         currentUser = user;
         currentUserData = userData;
 
-        loginScreen.classList.add('hidden');
-        loginScreen.style.display = 'none';
-        authenticatedApp.classList.remove('hidden');
-        authenticatedApp.style.display = 'flex';
+        const isAdmin = ['admin', 'national_admin'].includes(userData.role);
+        const isApproved = userData.status === 'approved';
 
-        userNameDisplay.textContent = userData.displayName || user.email;
+        if (isAdmin || isApproved) {
+            // ✅ Full access — show the app
+            showScreen('app');
+            userNameDisplay.textContent = userData.displayName || user.email;
+            applyRoleNav(userData.role);
 
-        // Apply role-based nav visibility
-        applyRoleNav(userData.role);
-        
-        // Background Pre-fetch for Offline Search (Phase 14)
-        if (userData.state) {
-            prefetchStateRegistry(userData.state);
+            if (userData.state) {
+                prefetchStateRegistry(userData.state);
+            }
+
+            initWizard(user, userData);
+            navigate('home');
+            showToast('Welcome Back', `Signed in as ${userData.displayName || user.email}`, 'success', 3000);
+        } else {
+            // ⏳ Pending — show waiting room
+            showScreen('waiting');
+            const waitingName = document.getElementById('waitingUserName');
+            if (waitingName) waitingName.textContent = userData.displayName || user.email;
         }
-
-        initWizard(user, userData);
-        navigate('home');
-
-        showToast('Welcome Back', `Signed in as ${userData.displayName || user.email}`, 'success', 3000);
     } else {
         currentUser = null;
         currentUserData = null;
-        loginScreen.classList.remove('hidden');
-        loginScreen.style.display = 'flex';
-        authenticatedApp.classList.add('hidden');
-        authenticatedApp.style.display = 'none';
+        showScreen('login');
         clearRoot(root);
     }
 });
+
+// ── Waiting Room: "Check Again" Button ──────────────────────────
+document.getElementById('btnCheckAgain')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btnCheckAgain');
+    btn.textContent = '⏳ Checking...';
+    btn.disabled = true;
+
+    try {
+        // Re-read the user's Firestore doc to check for approval
+        const { getDoc, doc } = await import("./db.js");
+        const userRef = doc(db, "users", currentUser.uid);
+        const freshDoc = await getDoc(userRef);
+        
+        if (freshDoc.exists()) {
+            const freshData = freshDoc.data();
+            if (freshData.status === 'approved' || ['admin', 'national_admin'].includes(freshData.role)) {
+                // 🎉 Approved! Reload the page to trigger full auth lifecycle
+                showToast('Access Granted!', 'Your account has been approved. Loading the portal...', 'success');
+                setTimeout(() => window.location.reload(), 1500);
+                return;
+            }
+        }
+        
+        showToast('Still Pending', 'Your access has not been approved yet. Please wait for the Admin.', 'warning', 4000);
+    } catch (err) {
+        console.error("Check again error:", err);
+        showToast('Error', 'Could not check status. Please try again.', 'error');
+    }
+
+    btn.textContent = '🔄 Check Again';
+    btn.disabled = false;
+});
+
+// ── Waiting Room: Sign Out ──────────────────────────────────────
+document.getElementById('btnWaitingSignOut')?.addEventListener('click', logOut);
