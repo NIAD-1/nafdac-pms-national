@@ -277,7 +277,7 @@ function renderTeamPage(root, userData, userLevel, users) {
                 'users',
                 uid,
                 { newRole: role, newState: state, newZone: zone },
-                user
+                userData
             );
             
             showToast('Success', `Access updated for ${role}.`, 'success');
