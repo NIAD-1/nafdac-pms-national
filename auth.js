@@ -159,7 +159,6 @@ async function notifyAdminNewUser(name, email) {
         return;
     }
     try {
-        // Load EmailJS SDK dynamically (no install needed)
         if (!window.emailjs) {
             const script = document.createElement('script');
             script.src = 'https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js';
@@ -168,12 +167,16 @@ async function notifyAdminNewUser(name, email) {
         }
         window.emailjs.init(EMAILJS_PUBLIC_KEY);
         await window.emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+            // Send all possible variable names to match any template format
             user_name: name,
             user_email: email,
-            time: new Date().toLocaleString()
+            email: email,
+            name: name,
+            time: new Date().toLocaleString(),
+            to_email: 'enilamaoshoriamhe687@gmail.com'
         });
         console.log("[Notify] 📧 Admin notified of new user:", email);
     } catch (err) {
-        console.warn("[Notify] Email notification failed (non-critical):", err);
+        console.warn("[Notify] Email notification failed:", err?.text || err?.message || err);
     }
 }
