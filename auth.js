@@ -176,3 +176,32 @@ async function notifyAdminNewUser(name, email) {
         console.warn("[Notify] Email notification failed:", err?.text || err?.message || err);
     }
 }
+
+// ── USER APPROVAL EMAIL NOTIFICATION ──────────────────────────
+// Create another template in EmailJS for User Approvals with variables:
+// {{user_name}}, {{portal_url}}
+const EMAILJS_USER_APPROVED_TEMPLATE_ID = 'YOUR_APPROVAL_TEMPLATE_ID';
+
+export async function notifyUserApproved(name, email) {
+    if (EMAILJS_USER_APPROVED_TEMPLATE_ID === 'YOUR_APPROVAL_TEMPLATE_ID') {
+        console.log("[Notify] User Approved template not configured. Skipping email.");
+        return;
+    }
+    try {
+        if (!window.emailjs) {
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js';
+            document.head.appendChild(script);
+            await new Promise(r => script.onload = r);
+        }
+        window.emailjs.init(EMAILJS_PUBLIC_KEY);
+        await window.emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_USER_APPROVED_TEMPLATE_ID, {
+            user_name: name,
+            to_email: email,    // The user's email address
+            portal_url: 'https://pmsd.netlify.app/'
+        });
+        console.log("[Notify] 📧 User notified of approval:", email);
+    } catch (err) {
+        console.warn("[Notify] Approval email failed:", err?.text || err?.message || err);
+    }
+}

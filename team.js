@@ -6,6 +6,7 @@
 import { db, doc, collection, getDocs, setDoc, serverTimestamp, query, where } from "./db.js";
 import { clearRoot, showLoading, showToast } from "./ui.js";
 import { ROLES, ZONES, ALL_STATES, getZoneForState } from "./constants.js";
+import { notifyUserApproved } from "./auth.js";
 import { logAuditAction } from "./audit.js";
 
 export async function loadTeamPage(root, user, userData) {
@@ -65,7 +66,12 @@ function renderTeamPage(root, userData, userLevel, users) {
     const isStateLocked = userLevel <= 2;
 
     const zoneOptionsHTML = Object.keys(ZONES).map(z => `<option value="${z}">${z}</option>`).join('');
-    const stateOptionsHTML = ALL_STATES.map(s => `<option value="${s}">${s}</option>`).join('');
+    
+    let allowedStates = ALL_STATES;
+    if (userLevel === 3 && userData.zone) {
+        allowedStates = ZONES[userData.zone] || ALL_STATES;
+    }
+    const stateOptionsHTML = allowedStates.map(s => `<option value="${s}">${s}</option>`).join('');
 
     const userOptionsHTML = users.map(u => `<option value="${u.id}">${u.displayName || u.email} (${u.role === 'pending' ? 'Pending Approval' : ROLES[u.role]?.label || u.role})</option>`).join('');
 
@@ -264,9 +270,18 @@ function renderTeamPage(root, userData, userLevel, users) {
                 updatedAt: serverTimestamp()
             };
 
+            const targetUser = users.find(x => x.id === uid);
+            let justApproved = false;
+
             // Only Admins can change status
             if (userLevel >= 4) {
-                updatePayload.status = document.getElementById('tStatus').value;
+                const newStatus = document.getElementById('tStatus').value;
+                updatePayload.status = newStatus;
+                
+                // Check if they were just approved
+                if (newStatus === 'approved' && targetUser && targetUser.status !== 'approved') {
+                    justApproved = true;
+                }
             }
 
             await setDoc(doc(db, "users", uid), updatePayload, { merge: true });
@@ -279,8 +294,12 @@ function renderTeamPage(root, userData, userLevel, users) {
                 { newRole: role, newState: state, newZone: zone },
                 userData
             );
-            
             showToast('Success', `Access updated for ${role}.`, 'success');
+            
+            if (justApproved && targetUser) {
+                notifyUserApproved(targetUser.displayName || targetUser.email, targetUser.email);
+            }
+            
             setTimeout(() => {
                 loadTeamPage(root, null, userData); // Refresh
             }, 1000);
