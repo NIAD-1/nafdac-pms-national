@@ -144,14 +144,10 @@ export async function logOut() {
     }
 }
 
-// ── ADMIN EMAIL NOTIFICATION (EmailJS) ─────────────────────────
-// Setup: 1. Go to https://www.emailjs.com and create a free account
-//        2. Create a Service (connect your Gmail)
-//        3. Create an Email Template with variables: {{user_name}}, {{user_email}}, {{time}}
-//        4. Replace the 3 values below with your own
-const EMAILJS_SERVICE_ID  = 'service_91zhfw3';
-const EMAILJS_TEMPLATE_ID = 'template_9hpp0aa';
-const EMAILJS_PUBLIC_KEY   = 'kCwwP4QT_OBENGN3M';
+
+const EMAILJS_SERVICE_ID = 'service_91zhfw3';
+const EMAILJS_TEMPLATE_ID = 'template_chvc2sa';
+const EMAILJS_PUBLIC_KEY = 'kCwwP4QT_OBENGN3M';
 
 async function notifyAdminNewUser(name, email) {
     if (EMAILJS_SERVICE_ID === 'YOUR_SERVICE_ID') {
