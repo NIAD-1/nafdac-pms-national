@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NAFDAC PMS — National Intelligence Portal</title>
+  <meta name="description" content="NAFDAC Post-Marketing Surveillance National Daily Reporting & Intelligence Platform for all 36 states of Nigeria.">
+
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" type="image/png" href="logo.png">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- Leaflet Maps CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <!-- Leaflet Maps JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json">
+</head>
+<body>
+
+  <!-- ═══ Login Screen ═══ -->
+  <div id="loginScreen">
+    <canvas id="particleCanvas" style="position:absolute;inset:0;z-index:0;opacity:0.6;pointer-events:none;"></canvas>
+    <div class="login-card animate-fade-in">
+      <img src="logo.png" alt="NAFDAC Logo">
+      <h1>PMS National</h1>
+      <p class="subtitle">Daily Reporting & Intelligence Portal</p>
+      <button id="btnSignIn" class="btn-google">
+        <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        Sign in with Google
+      </button>
+      <p class="small muted" style="margin-top: 28px; text-transform: uppercase; letter-spacing: 2px; font-size: 10px;">Secured by Internal Administration</p>
+    </div>
+  </div>
+
+  <!-- ═══ Authenticated App ═══ -->
+  <div id="authenticatedApp" class="hidden" style="display:none;">
+    
+    <!-- Mobile Header (Visible < 1024px) -->
+    <div id="mobileHeader" class="mobile-only" style="display:none; position:fixed; top:0; left:0; width:100%; height:60px; background:var(--bg-sidebar); z-index:1001; padding:0 16px; align-items:center; justify-content:space-between; box-shadow:0 2px 8px rgba(0,0,0,0.2);">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <button id="sidebarToggle" style="background:transparent; padding:8px; border:none; font-size:24px; color:white; cursor:pointer;">☰</button>
+        <div style="color:white; font-weight:800; font-size:14px; letter-spacing:1px; text-transform:uppercase;">NAFDAC PMS</div>
+      </div>
+      <img src="logo.png" style="height:32px; width:32px; background:white; border-radius:50%; padding:4px;">
+    </div>
+
+    <header id="sidebar">
+      <div class="logo-container">
+        <img src="logo.png" alt="NAFDAC Logo" class="logo-img">
+        <div class="logo-text">NAFDAC PMS</div>
+        <div class="logo-sub">National Intelligence Portal</div>
+      </div>
+
+      <div class="flex" style="flex-direction:column;width:100%;gap:0;">
+
+        <!-- Section: General -->
+        <div class="nav-section-label">General</div>
+        <div id="navGeneral">
+          <button class="nav-btn active" data-target="home" data-nav="home">🏠 Home</button>
+          <button class="nav-btn" data-target="team" data-nav="team">🤝 Manage Team</button>
+        </div>
+
+        <!-- Section: Daily Operations -->
+        <div class="nav-section-label" data-nav-section="activity">Daily Operations</div>
+        <div id="navOps">
+          <button class="nav-btn" data-target="activity" data-nav="activity">📋 Daily Activity</button>
+          <button class="nav-btn" data-target="facilities" data-nav="facilities">🏢 Facilities</button>
+        </div>
+
+        <!-- Section: Logs & Records -->
+        <div class="nav-section-label" data-nav-section="log-complaints">Logs & Records</div>
+        <div id="navLogs">
+          <button class="nav-btn" data-target="log-complaints" data-nav="log-complaints">📝 Log Complaints</button>
+          <button class="nav-btn" data-target="log-adverts" data-nav="log-adverts">📺 Log Adverts</button>
+          <button class="nav-btn" data-target="log-meetings" data-nav="log-meetings">📚 Meetings & QMS</button>
+          <button class="nav-btn" data-target="log-rasff" data-nav="log-rasff">🌐 RASFF Log</button>
+        </div>
+
+        <!-- Section: Finance -->
+        <div class="nav-section-label" data-nav-section="revenue">Finance</div>
+        <div id="navFinance">
+          <button class="nav-btn" data-target="revenue" data-nav="revenue">💰 Revenue</button>
+        </div>
+
+        <!-- Section: Intelligence -->
+        <div class="nav-section-label" data-nav-section="alerts">Intelligence</div>
+        <div id="navIntel">
+          <button class="nav-btn" data-target="alerts" data-nav="alerts">🚨 Alerts</button>
+          <button class="nav-btn" data-target="dashboard" data-nav="dashboard">📊 Dashboard</button>
+          <button class="nav-btn" data-target="compliance" data-nav="compliance">🗺️ Compliance</button>
+        </div>
+
+        <!-- User Info -->
+        <div id="userInfo" style="margin-top:auto;">
+          <div id="userName" style="font-size: 13px; font-weight: 600;">Director</div>
+        </div>
+        <button id="btnSignOut" class="secondary" style="padding: 10px 16px; font-size: 12px;">Sign Out</button>
+      </div>
+    </header>
+
+    <main id="app"></main>
+  </div>
+
+  <div id="modalContainer"></div>
+  <div id="toastContainer" class="toast-container"></div>
+
+  <script src="particles.js"></script>
+  <script type="module" src="app.js"></script>
+
+  <!-- PWA Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js')
+          .then(registration => {
+            console.log('ServiceWorker registration successful with scope: ', registration.scope);
+          }, err => {
+            console.log('ServiceWorker registration failed: ', err);
+          });
+      });
+    }
+  </script>
+</body>
+</html>
