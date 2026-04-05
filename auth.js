@@ -180,7 +180,7 @@ async function notifyAdminNewUser(name, email) {
 // ── USER APPROVAL EMAIL NOTIFICATION ──────────────────────────
 // Create another template in EmailJS for User Approvals with variables:
 // {{user_name}}, {{portal_url}}
-const EMAILJS_USER_APPROVED_TEMPLATE_ID = 'YOUR_APPROVAL_TEMPLATE_ID';
+const EMAILJS_USER_APPROVED_TEMPLATE_ID = 'template_vdomev4';
 
 export async function notifyUserApproved(name, email) {
     if (EMAILJS_USER_APPROVED_TEMPLATE_ID === 'YOUR_APPROVAL_TEMPLATE_ID') {
