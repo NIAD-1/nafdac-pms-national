@@ -1,11 +1,11 @@
 /**
  * ═══════════════════════════════════════════════════════════════
- * NAFDAC PMS v3 — APPLICATION SHELL & ROUTER
- * Multi-page routing with role-gating and daily escalation.
+ * NAFDAC PMS v4 — APPLICATION SHELL & ROUTER
+ * Email/Password auth with forced password change on first login.
  * ═══════════════════════════════════════════════════════════════
  */
 import { db, collection, getDocs, query, where, Timestamp, prefetchStateRegistry } from "./db.js";
-import { initAuth, signInWithGoogle, logOut, applyRoleNav, canAccessPage, getUserScope } from "./auth.js";
+import { initAuth, signInWithEmail, sendPasswordReset, changeUserPassword, logOut, applyRoleNav, canAccessPage, getUserScope } from "./auth.js";
 import { clearRoot, showToast, showLoading } from "./ui.js";
 import { initWizard, startReportWizard } from "./wizard.js";
 import { loadDashboard } from "./dashboard.js";
@@ -266,10 +266,92 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.onclick = (e) => navigate(e.target.dataset.target || e.target.closest('.nav-btn').dataset.target);
 });
 
-document.getElementById('btnSignIn').onclick = signInWithGoogle;
 document.getElementById('btnSignOut').onclick = logOut;
 
-// Mobile Sidebar Toggle
+// ── LOGIN FORM HANDLER ──────────────────────────────────────────
+const loginForm = document.getElementById('loginForm');
+if (loginForm) {
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('loginEmail').value.trim();
+        const password = document.getElementById('loginPassword').value;
+        const errorDiv = document.getElementById('loginError');
+        const btn = document.getElementById('btnSignIn');
+
+        errorDiv.style.display = 'none';
+        btn.textContent = 'Signing in...';
+        btn.disabled = true;
+
+        try {
+            await signInWithEmail(email, password);
+            // Auth state change will handle the rest
+        } catch (err) {
+            errorDiv.textContent = err.message;
+            errorDiv.style.display = 'block';
+        }
+
+        btn.textContent = 'Sign In';
+        btn.disabled = false;
+    });
+}
+
+// ── FORGOT PASSWORD HANDLER ─────────────────────────────────────
+document.getElementById('btnForgotPassword')?.addEventListener('click', async () => {
+    const email = document.getElementById('loginEmail')?.value?.trim();
+    if (!email) {
+        showToast('Enter Email', 'Please type your email address in the field above, then click Forgot Password.', 'warning', 5000);
+        return;
+    }
+    try {
+        await sendPasswordReset(email);
+        showToast('Email Sent', `A password reset link has been sent to ${email}. Check your inbox.`, 'success', 6000);
+    } catch (err) {
+        showToast('Error', err.message, 'error');
+    }
+});
+
+// ── PASSWORD CHANGE FORM HANDLER ────────────────────────────────
+const pwChangeForm = document.getElementById('passwordChangeForm');
+if (pwChangeForm) {
+    pwChangeForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const newPw = document.getElementById('newPassword').value;
+        const confirmPw = document.getElementById('confirmPassword').value;
+        const errorDiv = document.getElementById('pwChangeError');
+        const btn = pwChangeForm.querySelector('button[type="submit"]');
+
+        errorDiv.style.display = 'none';
+
+        if (newPw !== confirmPw) {
+            errorDiv.textContent = 'Passwords do not match. Please try again.';
+            errorDiv.style.display = 'block';
+            return;
+        }
+        if (newPw.length < 8) {
+            errorDiv.textContent = 'Password must be at least 8 characters.';
+            errorDiv.style.display = 'block';
+            return;
+        }
+
+        btn.textContent = 'Setting password...';
+        btn.disabled = true;
+
+        try {
+            await changeUserPassword(newPw);
+            showToast('Password Set!', 'Your new password has been saved. Loading the portal...', 'success');
+            setTimeout(() => window.location.reload(), 1500);
+        } catch (err) {
+            errorDiv.textContent = err.message;
+            errorDiv.style.display = 'block';
+            btn.textContent = '🔒 Set Password & Continue';
+            btn.disabled = false;
+        }
+    });
+}
+
+document.getElementById('btnPwChangeSignOut')?.addEventListener('click', logOut);
+
+// ── Mobile Sidebar Toggle ───────────────────────────────────────
 const sidebar = document.getElementById('sidebar');
 const toggle = document.getElementById('sidebarToggle');
 const overlay = document.getElementById('sidebarOverlay');
@@ -289,21 +371,21 @@ if (overlay) {
     overlay.onclick = closeSidebar;
 }
 
-// Screen references
-const waitingRoom = document.getElementById('waitingRoom');
+// ── SCREEN MANAGEMENT ───────────────────────────────────────────
+const passwordChangeScreen = document.getElementById('passwordChangeScreen');
 
 function showScreen(screen) {
     loginScreen.style.display = 'none';
     authenticatedApp.style.display = 'none';
-    waitingRoom.style.display = 'none';
+    if (passwordChangeScreen) passwordChangeScreen.style.display = 'none';
     loginScreen.classList.add('hidden');
     authenticatedApp.classList.add('hidden');
 
     if (screen === 'login') {
         loginScreen.style.display = 'flex';
         loginScreen.classList.remove('hidden');
-    } else if (screen === 'waiting') {
-        waitingRoom.style.display = 'flex';
+    } else if (screen === 'password-change') {
+        if (passwordChangeScreen) passwordChangeScreen.style.display = 'flex';
     } else if (screen === 'app') {
         authenticatedApp.style.display = 'flex';
         authenticatedApp.classList.remove('hidden');
@@ -316,10 +398,25 @@ initAuth(db, (user, userData) => {
         currentUser = user;
         currentUserData = userData;
 
+        // Check if this is an unauthorized email (not provisioned by admin)
+        if (userData.role === 'unauthorized' || userData.status === 'unauthorized') {
+            showToast('Access Denied', 'Your email is not registered in the system. Contact your administrator.', 'error', 6000);
+            logOut();
+            return;
+        }
+
         const isAdmin = ['admin', 'national_admin'].includes(userData.role);
         const isApproved = userData.status === 'approved';
 
         if (isAdmin || isApproved) {
+            // Check if they need to change their password first
+            if (userData.mustChangePassword) {
+                showScreen('password-change');
+                const pwName = document.getElementById('pwChangeUserName');
+                if (pwName) pwName.textContent = userData.displayName || user.email;
+                return;
+            }
+
             // ✅ Full access — show the app
             showScreen('app');
             userNameDisplay.textContent = userData.displayName || user.email;
@@ -333,10 +430,9 @@ initAuth(db, (user, userData) => {
             navigate('home');
             showToast('Welcome Back', `Signed in as ${userData.displayName || user.email}`, 'success', 3000);
         } else {
-            // ⏳ Pending — show waiting room
-            showScreen('waiting');
-            const waitingName = document.getElementById('waitingUserName');
-            if (waitingName) waitingName.textContent = userData.displayName || user.email;
+            // ⛔ Not approved — deny access
+            showToast('Access Pending', 'Your account has not been approved yet. Contact your administrator.', 'warning', 5000);
+            logOut();
         }
     } else {
         currentUser = null;
@@ -345,38 +441,3 @@ initAuth(db, (user, userData) => {
         clearRoot(root);
     }
 });
-
-// ── Waiting Room: "Check Again" Button ──────────────────────────
-document.getElementById('btnCheckAgain')?.addEventListener('click', async () => {
-    const btn = document.getElementById('btnCheckAgain');
-    btn.textContent = '⏳ Checking...';
-    btn.disabled = true;
-
-    try {
-        // Re-read the user's Firestore doc to check for approval
-        const { getDoc, doc } = await import("./db.js");
-        const userRef = doc(db, "users", currentUser.uid);
-        const freshDoc = await getDoc(userRef);
-        
-        if (freshDoc.exists()) {
-            const freshData = freshDoc.data();
-            if (freshData.status === 'approved' || ['admin', 'national_admin'].includes(freshData.role)) {
-                // 🎉 Approved! Reload the page to trigger full auth lifecycle
-                showToast('Access Granted!', 'Your account has been approved. Loading the portal...', 'success');
-                setTimeout(() => window.location.reload(), 1500);
-                return;
-            }
-        }
-        
-        showToast('Still Pending', 'Your access has not been approved yet. Please wait for the Admin.', 'warning', 4000);
-    } catch (err) {
-        console.error("Check again error:", err);
-        showToast('Error', 'Could not check status. Please try again.', 'error');
-    }
-
-    btn.textContent = '🔄 Check Again';
-    btn.disabled = false;
-});
-
-// ── Waiting Room: Sign Out ──────────────────────────────────────
-document.getElementById('btnWaitingSignOut')?.addEventListener('click', logOut);

@@ -1,12 +1,13 @@
 /**
  * ═══════════════════════════════════════════════════════════════
- * NAFDAC PMS v3 — TEAM MANAGEMENT (MANAGE TEAM)
+ * NAFDAC PMS v4 — TEAM MANAGEMENT (MANAGE TEAM)
+ * Admin-provisioned accounts with email/password auth.
  * ═══════════════════════════════════════════════════════════════
  */
 import { db, doc, collection, getDocs, setDoc, serverTimestamp, query, where } from "./db.js";
 import { clearRoot, showLoading, showToast } from "./ui.js";
 import { ROLES, ZONES, ALL_STATES, getZoneForState } from "./constants.js";
-import { notifyUserApproved } from "./auth.js";
+import { notifyUserApproved, createOfficerAccount } from "./auth.js";
 import { logAuditAction } from "./audit.js";
 
 export async function loadTeamPage(root, user, userData) {
@@ -76,15 +77,62 @@ function renderTeamPage(root, userData, userLevel, users) {
     const userOptionsHTML = users.map(u => `<option value="${u.id}">${u.displayName || u.email} (${u.role === 'pending' ? 'Pending Approval' : ROLES[u.role]?.label || u.role})</option>`).join('');
 
     root.innerHTML = `
-    <div class="animate-fade-in" style="max-width: 1000px; margin: 0 auto;">
+    <div class="animate-fade-in" style="max-width: 1100px; margin: 0 auto;">
         <h1 style="margin-bottom: 8px;">🤝 Manage Team Directory</h1>
-        <p class="muted" style="margin-bottom: 32px;">Approve new users and assign their roles and operational jurisdiction.</p>
+        <p class="muted" style="margin-bottom: 32px;">Create officer accounts, assign roles, and manage operational jurisdictions.</p>
+
+        ${userLevel >= 4 ? `
+        <!-- ═══ CREATE NEW OFFICER (ADMIN ONLY) ═══ -->
+        <div class="card" style="margin-bottom:24px; border-left:4px solid #008751;">
+            <h3 style="margin-bottom:4px;">➕ Create New Officer Account</h3>
+            <p class="muted small" style="margin-bottom:20px;">Provision a new account with a temporary password. The officer will be required to change it on first login.</p>
+            <form id="createOfficerForm" style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                <div>
+                    <label>Officer's Full Name <span style="color:var(--danger);">*</span></label>
+                    <input type="text" id="newOfficerName" placeholder="e.g. John Doe" required style="width:100%;">
+                </div>
+                <div>
+                    <label>Email Address <span style="color:var(--danger);">*</span></label>
+                    <input type="email" id="newOfficerEmail" placeholder="name@nafdac.gov.ng" required style="width:100%;">
+                </div>
+                <div>
+                    <label>Temporary Password <span style="color:var(--danger);">*</span></label>
+                    <input type="text" id="newOfficerPassword" placeholder="Min 8 chars" required minlength="8" style="width:100%;">
+                    <div class="input-hint">Officer must change this on first login.</div>
+                </div>
+                <div>
+                    <label>Role <span style="color:var(--danger);">*</span></label>
+                    <select id="newOfficerRole" required style="width:100%;">
+                        <option value="">Select Role...</option>
+                        ${roleOptionsHTML}
+                    </select>
+                </div>
+                <div>
+                    <label>Zone</label>
+                    <select id="newOfficerZone" style="width:100%;">
+                        <option value="">Select Zone...</option>
+                        ${zoneOptionsHTML}
+                    </select>
+                </div>
+                <div>
+                    <label>State</label>
+                    <select id="newOfficerState" style="width:100%;">
+                        <option value="">Select State...</option>
+                        ${stateOptionsHTML}
+                    </select>
+                </div>
+                <div style="grid-column: 1 / -1;">
+                    <button type="submit" class="primary" style="width:100%;">🔑 Create Account & Notify Officer</button>
+                </div>
+            </form>
+        </div>
+        ` : ''}
 
         <div style="display:flex; gap:24px; flex-wrap:wrap; align-items:flex-start;">
             
             <!-- ASSIGN ACCESS FORM -->
             <div class="card" style="flex:1; min-width:300px; position:sticky; top:20px;">
-                <h3 style="margin-bottom:20px;">Assign Officer Access</h3>
+                <h3 style="margin-bottom:20px;">Modify Officer Access</h3>
                 <form id="assignUserForm" style="display:flex; flex-direction:column; gap:16px;">
                     <div>
                         <label>Select Officer <span style="color:var(--danger);">*</span></label>
@@ -92,7 +140,7 @@ function renderTeamPage(root, userData, userLevel, users) {
                             <option value="">Choose a user...</option>
                             ${userOptionsHTML}
                         </select>
-                        <div class="input-hint">List includes all users who have signed into the portal.</div>
+                        <div class="input-hint">Select an existing officer to modify their access.</div>
                     </div>
                     <div>
                         <label>Role</label>
@@ -129,7 +177,7 @@ function renderTeamPage(root, userData, userLevel, users) {
                 </form>
             </div>
 
-            <!-- DIRECTORY DIRECTORY -->
+            <!-- PERSONNEL DIRECTORY -->
             <div class="card" style="flex:2; min-width:400px; padding:0; overflow:hidden;">
                 <div style="padding:20px; border-bottom:1px solid var(--border-subtle); display:flex; justify-content:space-between; align-items:center;">
                     <h3 style="margin:0;">Active Personnel Directory</h3>
@@ -312,4 +360,74 @@ function renderTeamPage(root, userData, userLevel, users) {
             btn.disabled = false;
         }
     });
+
+    // ── CREATE NEW OFFICER FORM (ADMIN ONLY) ─────────────────────
+    const createForm = document.getElementById('createOfficerForm');
+    if (createForm) {
+        // Auto-map state → zone for the create form
+        const newStateSelect = document.getElementById('newOfficerState');
+        const newZoneSelect = document.getElementById('newOfficerZone');
+        if (newStateSelect && newZoneSelect) {
+            newStateSelect.addEventListener('change', (e) => {
+                const z = getZoneForState(e.target.value);
+                if (z) newZoneSelect.value = z;
+            });
+        }
+
+        createForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const name = document.getElementById('newOfficerName').value.trim();
+            const email = document.getElementById('newOfficerEmail').value.trim();
+            const password = document.getElementById('newOfficerPassword').value;
+            const role = document.getElementById('newOfficerRole').value;
+            let state = document.getElementById('newOfficerState').value;
+            let zone = document.getElementById('newOfficerZone').value;
+
+            if (!name || !email || !password || !role) {
+                showToast('Validation Error', 'Please fill in all required fields.', 'error');
+                return;
+            }
+
+            // Auto-fill zone from state
+            if (state && !zone) {
+                zone = getZoneForState(state) || '';
+            }
+
+            const btn = createForm.querySelector('button[type="submit"]');
+            btn.textContent = 'Creating account...';
+            btn.disabled = true;
+
+            try {
+                const newUid = await createOfficerAccount(email, password, {
+                    displayName: name,
+                    role: role,
+                    state: state,
+                    zone: zone
+                });
+
+                await logAuditAction(
+                    'OFFICER_ACCOUNT_CREATED',
+                    'users',
+                    newUid,
+                    { email, role, state, zone },
+                    userData
+                );
+
+                showToast('Account Created!', `${name} (${email}) can now log in with the temporary password.`, 'success', 5000);
+                createForm.reset();
+
+                setTimeout(() => {
+                    loadTeamPage(root, null, userData); // Refresh
+                }, 1500);
+
+            } catch (err) {
+                console.error(err);
+                showToast('Creation Failed', err.message, 'error');
+            }
+
+            btn.textContent = '🔑 Create Account & Notify Officer';
+            btn.disabled = false;
+        });
+    }
 }
