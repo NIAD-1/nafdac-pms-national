@@ -1,9 +1,10 @@
 /**
  * ═══════════════════════════════════════════════════════════════
- * NAFDAC PMS v2 — NATIONAL INTELLIGENCE DASHBOARD
+ * NAFDAC PMS v4 — NATIONAL INTELLIGENCE DASHBOARD
+ * Scalable pagination, XLSX export, and date-range queries.
  * ═══════════════════════════════════════════════════════════════
  */
-import { db, collection, getDocs, query, limit, orderBy } from "./db.js";
+import { db, collection, getDocs, query, limit, orderBy, where, Timestamp } from "./db.js";
 import { clearRoot, showLoading, showToast } from "./ui.js";
 import { ZONES, ALL_STATES, ACTIVITY_TYPES, ACTIVITY_KEYS, formatCurrency } from "./constants.js";
 import { getUserScope } from "./auth.js";
@@ -18,6 +19,9 @@ let filteredRevenue = [];
 
 let dashboardMap = null;
 let mapMarkers = [];
+let currentTablePage = 0;
+const TABLE_PAGE_SIZE = 50;
+const QUERY_LIMIT = 2000;
 
 const NIGERIAN_STATES_COORD = {
     "Abia": [5.5320, 7.4860], "Adamawa": [9.3333, 12.5000], "Akwa Ibom": [5.0000, 7.8333],
@@ -39,17 +43,16 @@ export async function loadDashboard(root, dbInst, user, userData) {
     showLoading(root, 'Loading master intelligence data...');
 
     try {
-        // We fetch a capped number of reports for client filtering to protect memory
-        // Ordered natively to get the latest activities
-        const rQuery = query(collection(db, 'facilityReports'), orderBy('createdAt', 'desc'), limit(500));
+        // Fetch data with increased limits for 200+ officer scale
+        const rQuery = query(collection(db, 'facilityReports'), orderBy('createdAt', 'desc'), limit(QUERY_LIMIT));
         const rSnap = await getDocs(rQuery);
         allReports = rSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-        const sQuery = query(collection(db, 'sanctions'), orderBy('createdAt', 'desc'), limit(500));
+        const sQuery = query(collection(db, 'sanctions'), orderBy('createdAt', 'desc'), limit(QUERY_LIMIT));
         const sSnap = await getDocs(sQuery); 
         allSanctions = sSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-        const revQuery = query(collection(db, 'revenue'), limit(500));
+        const revQuery = query(collection(db, 'revenue'), limit(QUERY_LIMIT));
         const revSnap = await getDocs(revQuery); 
         allRevenueManual = revSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
@@ -98,12 +101,12 @@ function renderDashboardUI(root, userData) {
 
     root.innerHTML = `
     <div class="animate-fade-in">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; flex-wrap:wrap; gap:12px;">
             <div>
                 <h1 style="margin:0;">📊 National Intelligence Dashboard</h1>
                 <p class="muted small">Filter actions, facilities, infractions and revenue.</p>
             </div>
-            <button class="secondary" id="exportCsv">📥 Export CSV</button>
+            <button class="secondary" id="exportXlsx" style="display:flex; align-items:center; gap:6px;">📥 Export Excel (.xlsx)</button>
         </div>
 
         <!-- Filter Bar -->
@@ -159,7 +162,10 @@ function renderDashboardUI(root, userData) {
 
         <!-- Table View -->
         <div class="card" style="margin-top:24px;">
-            <h3 style="margin-bottom:16px;">🔍 Filtered Entries</h3>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:8px;">
+                <h3 style="margin:0;">🔍 Filtered Entries</h3>
+                <span id="tableRecordCount" class="muted small"></span>
+            </div>
             <div style="overflow-x:auto;">
                 <table id="filteredTable" style="width:100%; text-align:left;">
                     <thead>
@@ -176,10 +182,13 @@ function renderDashboardUI(root, userData) {
                     <tbody id="filteredTableBody"></tbody>
                 </table>
             </div>
+            <!-- Pagination Controls -->
+            <div id="tablePagination" style="display:flex; justify-content:center; align-items:center; gap:12px; margin-top:16px; padding-top:16px; border-top:1px solid var(--border-subtle);"></div>
         </div>
     </div>`;
 
-    document.getElementById('btnFilter').onclick = applyFilters;
+    document.getElementById('btnFilter').onclick = () => { currentTablePage = 0; applyFilters(); };
+    document.getElementById('exportXlsx')?.addEventListener('click', exportToExcel);
     
     // Initialize Leaflet Map
     if (typeof L !== 'undefined') {
@@ -365,54 +374,126 @@ function updateDashboardMetrics() {
     document.getElementById('metricCardsView').innerHTML = cardsHtml;
 }
 
+function getReportRowData(r) {
+    const dDate = r.inspectionDate || r.meetingDate || r.qmsDate || r.dateOfCase || r.approvalDate || '—';
+    const dState = r.state || '—';
+    const dLga = r.lga || '—';
+    const dAct = r.sourceActivity || mapActivityKeyToLabel(r.activityKey || r.activityType);
+    const dFac = r.facilityName || '—';
+    
+    let mopUpTotal = 0; let holdTotal = 0;
+    if (r.conditionalData) {
+        const prefixSum = (pfx) => ['Drugs','Food','Cosmetics','MedDevices','Vaccines','Chemicals','Herbals','Water']
+            .reduce((sum, k) => sum + (Number(r.conditionalData[pfx+k])||0), 0);
+        mopUpTotal = prefixSum('mopUp');
+        holdTotal = prefixSum('hold');
+    }
+    if (r.mopUpQuantity) mopUpTotal += Number(r.mopUpQuantity);
+    if (r.holdQuantity) holdTotal += Number(r.holdQuantity);
+
+    const associatedRevenue = 
+        filteredSanctions.filter(s => s.facilityName === r.facilityName).reduce((sum,s) => sum+(Number(s.amount)||0), 0) +
+        filteredRevenue.filter(s => s.facilityName === r.facilityName).reduce((sum,s) => sum+(Number(s.amount)||0), 0);
+
+    return { dDate, dState, dLga, dAct, dFac, mopUpTotal, holdTotal, associatedRevenue };
+}
+
 function updateDashboardTable() {
     const tbody = document.getElementById('filteredTableBody');
+    const countEl = document.getElementById('tableRecordCount');
+    const paginationEl = document.getElementById('tablePagination');
+    const total = filteredReports.length;
     
-    // Convert sanctions/revenue into mock reports to show in the same table if needed, 
-    // or just show the reports. We will just show the filtered reports to keep it clean.
+    if (countEl) countEl.textContent = `${total.toLocaleString()} records found`;
     
-    if (filteredReports.length === 0) {
+    if (total === 0) {
         tbody.innerHTML = '<tr><td colspan="7" class="muted" style="text-align:center;padding:24px;">No records match your filters.</td></tr>';
+        if (paginationEl) paginationEl.innerHTML = '';
         return;
     }
 
-    const rows = filteredReports.slice(0, 100).map(r => {
-        const dDate = r.inspectionDate || r.meetingDate || r.qmsDate || r.dateOfCase || r.approvalDate || '—';
-        const dState = r.state ? `${r.state} / ${r.lga||'—'}` : '—';
-        const dAct = r.sourceActivity || mapActivityKeyToLabel(r.activityKey || r.activityType);
-        const dFac = r.facilityName || '—';
-        
-        let mopUpTotal = 0; let holdTotal = 0;
-        if (r.conditionalData) {
-            const prefixSum = (pfx) => ['Drugs','Food','Cosmetics','MedDevices','Vaccines','Chemicals','Herbals','Water']
-                .reduce((sum, k) => sum + (Number(r.conditionalData[pfx+k])||0), 0);
-            mopUpTotal = prefixSum('mopUp');
-            holdTotal = prefixSum('hold');
-        }
-        if (r.mopUpQuantity) mopUpTotal += Number(r.mopUpQuantity);
-        if (r.holdQuantity) holdTotal += Number(r.holdQuantity);
+    const totalPages = Math.ceil(total / TABLE_PAGE_SIZE);
+    if (currentTablePage >= totalPages) currentTablePage = totalPages - 1;
+    const startIdx = currentTablePage * TABLE_PAGE_SIZE;
+    const pageData = filteredReports.slice(startIdx, startIdx + TABLE_PAGE_SIZE);
 
-        // Find associated revenue by facility
-        const associatedRevenue = 
-            filteredSanctions.filter(s => s.facilityName === r.facilityName).reduce((sum,s) => sum+(Number(s.amount)||0), 0) +
-            filteredRevenue.filter(s => s.facilityName === r.facilityName).reduce((sum,s) => sum+(Number(s.amount)||0), 0);
-
+    const rows = pageData.map(r => {
+        const d = getReportRowData(r);
         return `
         <tr style="border-bottom:1px solid var(--border-subtle); font-size:13px;">
-            <td style="padding:12px;">${dDate}</td>
-            <td style="padding:12px;">${dState}</td>
-            <td style="padding:12px;"><span class="badge badge-blue">${dAct}</span></td>
-            <td style="padding:12px; font-weight:600;">${dFac}</td>
-            <td style="padding:12px;">${mopUpTotal > 0 ? `<span style="color:var(--danger);font-weight:600;">${mopUpTotal}</span>` : '—'}</td>
-            <td style="padding:12px;">${holdTotal > 0 ? `<span style="color:#f59e0b;font-weight:600;">${holdTotal}</span>` : '—'}</td>
-            <td style="padding:12px; font-weight:700;">${associatedRevenue > 0 ? formatCurrency(associatedRevenue) : '—'}</td>
+            <td style="padding:12px;">${d.dDate}</td>
+            <td style="padding:12px;">${d.dState} / ${d.dLga}</td>
+            <td style="padding:12px;"><span class="badge badge-blue">${d.dAct}</span></td>
+            <td style="padding:12px; font-weight:600;">${d.dFac}</td>
+            <td style="padding:12px;">${d.mopUpTotal > 0 ? `<span style="color:var(--danger);font-weight:600;">${d.mopUpTotal}</span>` : '—'}</td>
+            <td style="padding:12px;">${d.holdTotal > 0 ? `<span style="color:#f59e0b;font-weight:600;">${d.holdTotal}</span>` : '—'}</td>
+            <td style="padding:12px; font-weight:700;">${d.associatedRevenue > 0 ? formatCurrency(d.associatedRevenue) : '—'}</td>
         </tr>`;
     });
 
-    let extraHtml = '';
-    if (filteredReports.length > 100) {
-        extraHtml = `<tr><td colspan="7" class="muted" style="text-align:center;padding:12px;">Showing first 100 results...</td></tr>`;
-    }
+    tbody.innerHTML = rows.join('');
 
-    tbody.innerHTML = rows.join('') + extraHtml;
+    // Render pagination controls
+    if (paginationEl && totalPages > 1) {
+        paginationEl.innerHTML = `
+            <button id="pgPrev" class="secondary" style="padding:6px 14px; font-size:13px;" ${currentTablePage === 0 ? 'disabled' : ''}>← Prev</button>
+            <span class="muted small">Page ${currentTablePage + 1} of ${totalPages}</span>
+            <button id="pgNext" class="secondary" style="padding:6px 14px; font-size:13px;" ${currentTablePage >= totalPages - 1 ? 'disabled' : ''}>Next →</button>
+        `;
+        document.getElementById('pgPrev')?.addEventListener('click', () => { currentTablePage--; updateDashboardTable(); });
+        document.getElementById('pgNext')?.addEventListener('click', () => { currentTablePage++; updateDashboardTable(); });
+    } else if (paginationEl) {
+        paginationEl.innerHTML = '';
+    }
+}
+
+// ── XLSX EXPORT (SheetJS) ───────────────────────────────────────
+async function exportToExcel() {
+    showToast('Preparing Export', 'Building Excel file...', 'info', 3000);
+    try {
+        // Dynamically load SheetJS
+        if (!window.XLSX) {
+            const script = document.createElement('script');
+            script.src = 'https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js';
+            document.head.appendChild(script);
+            await new Promise((resolve, reject) => {
+                script.onload = resolve;
+                script.onerror = () => reject(new Error('Failed to load SheetJS'));
+            });
+        }
+
+        // Build rows from ALL filtered data (not just current page)
+        const exportData = filteredReports.map(r => {
+            const d = getReportRowData(r);
+            return {
+                'Date': d.dDate,
+                'State': d.dState,
+                'LGA': d.dLga,
+                'Activity': d.dAct,
+                'Facility': d.dFac,
+                'Mop Up Qty': d.mopUpTotal,
+                'Hold Qty': d.holdTotal,
+                'Revenue (₦)': d.associatedRevenue,
+                'Officer': r.submittedBy || r.officerName || '—',
+                'Zone': r.zone || '—'
+            };
+        });
+
+        const ws = window.XLSX.utils.json_to_sheet(exportData);
+        const wb = window.XLSX.utils.book_new();
+        window.XLSX.utils.book_append_sheet(wb, ws, 'PMS Intelligence Data');
+
+        // Auto-width columns
+        const colWidths = Object.keys(exportData[0] || {}).map(key => ({
+            wch: Math.max(key.length, ...exportData.map(row => String(row[key] || '').length).slice(0, 100)) + 2
+        }));
+        ws['!cols'] = colWidths;
+
+        const dateStr = new Date().toISOString().split('T')[0];
+        window.XLSX.writeFile(wb, `NAFDAC_PMS_Report_${dateStr}.xlsx`);
+        showToast('Export Complete', `${exportData.length} records exported to Excel.`, 'success');
+    } catch (err) {
+        console.error('Export error:', err);
+        showToast('Export Failed', err.message, 'error');
+    }
 }

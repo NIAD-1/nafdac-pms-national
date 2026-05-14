@@ -65,12 +65,23 @@ export function showModal(title, bodyHtml, onConfirm, confirmText = 'Confirm') {
     }
 }
 
-// === LOADING ==================================================
+// === LOADING (Skeleton Placeholders) =============================
 export function showLoading(root, msg = 'Loading...') {
     root.innerHTML = `
-        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;">
-            <div class="spinner spinner-lg"></div>
-            <p class="muted" style="margin-top:16px;">${msg}</p>
+        <div class="animate-fade-in">
+            <div class="skeleton-header">
+                <div class="skeleton skeleton-title"></div>
+                <div class="skeleton skeleton-subtitle"></div>
+            </div>
+            <div class="skeleton-stats">
+                <div class="skeleton skeleton-card"></div>
+                <div class="skeleton skeleton-card"></div>
+                <div class="skeleton skeleton-card"></div>
+                <div class="skeleton skeleton-card"></div>
+            </div>
+            <div class="skeleton skeleton-block"></div>
+            <div class="skeleton skeleton-block-sm"></div>
+            <p class="muted" style="text-align:center; margin-top:20px; font-size:13px;">${msg}</p>
         </div>`;
 }
 

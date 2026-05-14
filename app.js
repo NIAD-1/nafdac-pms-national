@@ -27,6 +27,47 @@ const userNameDisplay = document.getElementById('userName');
 let currentUser = null;
 let currentUserData = null;
 
+// ── SESSION TIMEOUT (30 min inactivity) ─────────────────────────
+const SESSION_TIMEOUT_MS = 30 * 60 * 1000;  // 30 minutes
+const SESSION_WARNING_MS = 25 * 60 * 1000;  // Warn at 25 minutes
+let sessionTimer = null;
+let warningTimer = null;
+
+function resetSessionTimer() {
+    clearTimeout(sessionTimer);
+    clearTimeout(warningTimer);
+    if (!currentUser) return;
+
+    warningTimer = setTimeout(() => {
+        showToast('Session Expiring', 'You will be logged out in 5 minutes due to inactivity.', 'warning', 10000);
+    }, SESSION_WARNING_MS);
+
+    sessionTimer = setTimeout(() => {
+        showToast('Session Expired', 'You have been logged out due to 30 minutes of inactivity.', 'error', 8000);
+        logOut();
+    }, SESSION_TIMEOUT_MS);
+}
+
+// Track user activity
+['click', 'keydown', 'mousemove', 'touchstart', 'scroll'].forEach(evt => {
+    document.addEventListener(evt, resetSessionTimer, { passive: true });
+});
+
+// ── OFFLINE / ONLINE DETECTION ──────────────────────────────────
+function updateOnlineStatus() {
+    const banner = document.getElementById('offlineBanner');
+    if (!banner) return;
+    if (navigator.onLine) {
+        banner.style.display = 'none';
+    } else {
+        banner.style.display = 'flex';
+    }
+}
+window.addEventListener('online', updateOnlineStatus);
+window.addEventListener('offline', updateOnlineStatus);
+// Check on load
+document.addEventListener('DOMContentLoaded', updateOnlineStatus);
+
 // ── Page Navigation ─────────────────────────────────────────────
 async function navigate(page) {
     if (!currentUser || !currentUserData) return;
@@ -428,6 +469,7 @@ initAuth(db, (user, userData) => {
 
             initWizard(user, userData);
             navigate('home');
+            resetSessionTimer(); // Start inactivity countdown
             showToast('Welcome Back', `Signed in as ${userData.displayName || user.email}`, 'success', 3000);
         } else {
             // ⛔ Not approved — deny access

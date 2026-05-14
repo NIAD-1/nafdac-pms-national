@@ -122,9 +122,25 @@ function renderTeamPage(root, userData, userLevel, users) {
                     </select>
                 </div>
                 <div style="grid-column: 1 / -1;">
-                    <button type="submit" class="primary" style="width:100%;">🔑 Create Account & Notify Officer</button>
+                    <button type="submit" class="primary" style="width:100;">🔑 Create Account & Notify Officer</button>
                 </div>
             </form>
+
+            <!-- BULK CSV UPLOAD -->
+            <div style="margin-top:24px; padding-top:20px; border-top:2px dashed var(--border-subtle);">
+                <h4 style="margin-bottom:4px;">📁 Bulk Upload via CSV</h4>
+                <p class="muted small" style="margin-bottom:12px;">Upload a CSV file with columns: <code>Name, Email, Password, Role, State, Zone</code></p>
+                <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+                    <input type="file" id="csvUpload" accept=".csv" style="font-size:13px;">
+                    <button id="btnBulkUpload" class="secondary" style="padding:8px 20px;">🚀 Upload & Create All</button>
+                </div>
+                <div id="bulkProgress" style="margin-top:12px; display:none;">
+                    <div style="background:var(--bg-secondary); border-radius:8px; height:8px; overflow:hidden; margin-bottom:8px;">
+                        <div id="bulkProgressBar" style="height:100%; background:var(--nafdac-green); width:0%; transition:width 0.3s;"></div>
+                    </div>
+                    <p id="bulkStatus" class="muted small"></p>
+                </div>
+            </div>
         </div>
         ` : ''}
 
@@ -428,6 +444,114 @@ function renderTeamPage(root, userData, userLevel, users) {
 
             btn.textContent = '🔑 Create Account & Notify Officer';
             btn.disabled = false;
+        });
+    }
+
+    // ── BULK CSV UPLOAD HANDLER (ADMIN ONLY) ─────────────────────
+    const bulkBtn = document.getElementById('btnBulkUpload');
+    if (bulkBtn) {
+        bulkBtn.addEventListener('click', async () => {
+            const fileInput = document.getElementById('csvUpload');
+            if (!fileInput.files.length) {
+                showToast('No File', 'Please select a CSV file first.', 'warning');
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const text = await file.text();
+            const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+            if (lines.length < 2) {
+                showToast('Empty File', 'CSV must have a header row and at least one data row.', 'error');
+                return;
+            }
+
+            // Parse header
+            const header = lines[0].split(',').map(h => h.trim().toLowerCase());
+            const nameIdx = header.findIndex(h => h.includes('name'));
+            const emailIdx = header.findIndex(h => h.includes('email'));
+            const pwIdx = header.findIndex(h => h.includes('password'));
+            const roleIdx = header.findIndex(h => h.includes('role'));
+            const stateIdx = header.findIndex(h => h.includes('state'));
+            const zoneIdx = header.findIndex(h => h.includes('zone'));
+
+            if (nameIdx === -1 || emailIdx === -1 || pwIdx === -1) {
+                showToast('Invalid CSV', 'CSV must have columns: Name, Email, Password. Role/State/Zone are optional.', 'error');
+                return;
+            }
+
+            const rows = lines.slice(1).map(line => {
+                const cols = line.split(',').map(c => c.trim());
+                return {
+                    name: cols[nameIdx] || '',
+                    email: cols[emailIdx] || '',
+                    password: cols[pwIdx] || '',
+                    role: roleIdx >= 0 ? cols[roleIdx] || 'field_officer' : 'field_officer',
+                    state: stateIdx >= 0 ? cols[stateIdx] || '' : '',
+                    zone: zoneIdx >= 0 ? cols[zoneIdx] || '' : ''
+                };
+            }).filter(r => r.email && r.password);
+
+            if (rows.length === 0) {
+                showToast('No Valid Rows', 'No valid data rows found in the CSV.', 'error');
+                return;
+            }
+
+            // Show progress UI
+            const progressDiv = document.getElementById('bulkProgress');
+            const progressBar = document.getElementById('bulkProgressBar');
+            const statusText = document.getElementById('bulkStatus');
+            progressDiv.style.display = 'block';
+            bulkBtn.disabled = true;
+            bulkBtn.textContent = 'Processing...';
+
+            let success = 0;
+            let failed = 0;
+            const errors = [];
+
+            for (let i = 0; i < rows.length; i++) {
+                const r = rows[i];
+                const pct = Math.round(((i + 1) / rows.length) * 100);
+                progressBar.style.width = pct + '%';
+                statusText.textContent = `Processing ${i + 1} of ${rows.length}: ${r.email}...`;
+
+                // Auto-fill zone from state
+                if (r.state && !r.zone) {
+                    r.zone = getZoneForState(r.state) || '';
+                }
+
+                try {
+                    await createOfficerAccount(r.email, r.password, {
+                        displayName: r.name,
+                        role: r.role,
+                        state: r.state,
+                        zone: r.zone
+                    });
+                    success++;
+                } catch (err) {
+                    failed++;
+                    errors.push(`${r.email}: ${err.message}`);
+                }
+
+                // Small delay to avoid Firebase rate limits
+                await new Promise(resolve => setTimeout(resolve, 300));
+            }
+
+            progressBar.style.width = '100%';
+            statusText.textContent = `✅ Complete! ${success} created, ${failed} failed.`;
+            bulkBtn.textContent = '🚀 Upload & Create All';
+            bulkBtn.disabled = false;
+
+            if (failed > 0) {
+                showToast('Bulk Upload Done', `${success} accounts created. ${failed} failed. Check console for details.`, 'warning', 8000);
+                console.warn('[Bulk Upload] Failed accounts:', errors);
+            } else {
+                showToast('All Accounts Created!', `${success} officer accounts provisioned successfully.`, 'success', 5000);
+            }
+
+            setTimeout(() => {
+                loadTeamPage(root, null, userData);
+            }, 2000);
         });
     }
 }
