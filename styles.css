@@ -1051,3 +1051,25 @@ tbody tr:hover { background: #f8fafc; cursor: pointer; }
   .skeleton-stats { grid-template-columns: 1fr; }
   .skeleton-title { width: 180px; }
 }
+
+/* ── Mobile App Standalone & Touch Enhancements ───────────────────────────── */
+@media all and (display-mode: standalone) {
+  body {
+    padding-top: max(12px, env(safe-area-inset-top));
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Prevent iOS Safari auto-zoom on form inputs */
+@media screen and (max-width: 768px) {
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="date"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
