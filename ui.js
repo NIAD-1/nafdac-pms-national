@@ -258,3 +258,14 @@ export function animateCounter(el, target) {
         el.textContent = current.toLocaleString();
     }, 16);
 }
+
+// === HTML ESCAPING FOR XSS PROTECTION ==========================
+export function escapeHtml(str) {
+    if (!str && str !== 0) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}

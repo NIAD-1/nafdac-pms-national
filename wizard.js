@@ -7,7 +7,7 @@
  * ═══════════════════════════════════════════════════════════════
  */
 import { db, collection, addDoc, getDocs, query, where, serverTimestamp, upsertFacility } from "./db.js";
-import { clearRoot, navigate, showLoading, showToast, buildFormFields, renderWizardProgress, validateForm, renderConditionalFields, initFormChoices } from "./ui.js";
+import { clearRoot, showLoading, showToast, buildFormFields, renderWizardProgress, validateForm, renderConditionalFields, initFormChoices } from "./ui.js";
 import { ZONES, DAILY_ACTIVITIES, DAILY_ACTIVITY_KEYS, LGA_BY_STATE, getTodayStr } from "./constants.js";
 import { logAuditAction } from "./audit.js";
 

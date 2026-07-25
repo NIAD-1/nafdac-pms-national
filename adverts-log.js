@@ -6,7 +6,7 @@
  */
 import { db, collection, addDoc, getDocs, query, where, serverTimestamp } from "./db.js";
 import { getUserScope } from "./auth.js";
-import { clearRoot, showToast, showLoading, buildFormFields, initFormChoices } from "./ui.js";
+import { clearRoot, showToast, buildFormFields, initFormChoices } from "./ui.js";
 import { ADVERT_FIELDS, getTodayStr } from "./constants.js";
 
 export async function loadAdvertsPage(root, currentUser, currentUserData) {

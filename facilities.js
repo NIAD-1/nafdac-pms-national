@@ -4,10 +4,9 @@
  * Facility directory, search, profiles with activity history.
  * ═══════════════════════════════════════════════════════════════
  */
-import { db, collection, getDocs, query, where, orderBy, doc, getDoc, limit } from "./db.js";
-import { clearRoot, showToast, showLoading, showModal } from "./ui.js";
-import { formatCurrency, getZoneForState } from "./constants.js";
-import { getUserScope } from "./auth.js";
+import { db, collection, getDocs, query, where, orderBy, limit } from "./db.js";
+import { showLoading } from "./ui.js";
+import { formatCurrency } from "./constants.js";
 
 export async function loadFacilitiesPage(root, user, userData) {
     showLoading(root, 'Loading facilities...');
@@ -173,7 +172,7 @@ export async function showFacilityProfile(facility) {
     // 1. Get Daily Activities
     let activities = [];
     try {
-        const q = query(collection(db, 'facilityReports'), where('facilityName', '==', facility.name));
+        const q = query(collection(db, 'facilityReports'), where('facilityName', '==', facility.name), limit(50));
         const snap = await getDocs(q);
         activities = snap.docs.map(d => d.data());
     } catch (e) {}
@@ -181,7 +180,7 @@ export async function showFacilityProfile(facility) {
     // 2. Get Sanctions
     let sanctions = [];
     try {
-        const q = query(collection(db, 'sanctions'), where('facilityName', '==', facility.name));
+        const q = query(collection(db, 'sanctions'), where('facilityName', '==', facility.name), limit(50));
         const snap = await getDocs(q);
         sanctions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     } catch (e) {}
@@ -189,7 +188,7 @@ export async function showFacilityProfile(facility) {
     // 3. Get Complaints
     let complaints = [];
     try {
-        const q = query(collection(db, 'complaints'), where('facilityName', '==', facility.name));
+        const q = query(collection(db, 'complaints'), where('facilityName', '==', facility.name), limit(50));
         const snap = await getDocs(q);
         complaints = snap.docs.map(d => d.data());
     } catch (e) {}
@@ -197,7 +196,7 @@ export async function showFacilityProfile(facility) {
     // 4. Get Revenue
     let revenues = [];
     try {
-        const q = query(collection(db, 'revenue'), where('facilityName', '==', facility.name));
+        const q = query(collection(db, 'revenue'), where('facilityName', '==', facility.name), limit(50));
         const snap = await getDocs(q);
         revenues = snap.docs.map(d => d.data());
     } catch (e) {}

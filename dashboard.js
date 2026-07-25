@@ -5,7 +5,7 @@
  * ═══════════════════════════════════════════════════════════════
  */
 import { db, collection, getDocs, query, limit, orderBy, where, Timestamp } from "./db.js";
-import { clearRoot, showLoading, showToast } from "./ui.js";
+import { clearRoot, showLoading, showToast, escapeHtml } from "./ui.js";
 import { ZONES, ALL_STATES, ACTIVITY_TYPES, ACTIVITY_KEYS, formatCurrency } from "./constants.js";
 import { getUserScope } from "./auth.js";
 
@@ -43,31 +43,48 @@ export async function loadDashboard(root, dbInst, user, userData) {
     showLoading(root, 'Loading master intelligence data...');
 
     try {
-        // Fetch data with increased limits for 200+ officer scale
-        const rQuery = query(collection(db, 'facilityReports'), orderBy('createdAt', 'desc'), limit(QUERY_LIMIT));
+        const scope = getUserScope();
+        
+        let rConstraints = [];
+        let sConstraints = [];
+        let revConstraints = [];
+
+        if (scope.state) {
+            rConstraints.push(where('state', '==', scope.state));
+            sConstraints.push(where('state', '==', scope.state));
+            revConstraints.push(where('state', '==', scope.state));
+        } else if (scope.zone) {
+            rConstraints.push(where('zone', '==', scope.zone));
+            sConstraints.push(where('zone', '==', scope.zone));
+            revConstraints.push(where('zone', '==', scope.zone));
+        }
+
+        rConstraints.push(limit(QUERY_LIMIT));
+        sConstraints.push(limit(QUERY_LIMIT));
+        revConstraints.push(limit(QUERY_LIMIT));
+
+        // Fetch data with state/zone scopes applied directly in the query to minimize read volumes.
+        // We do sorting in memory rather than Firestore's orderBy to avoid requiring composite indexes for every coordinator.
+        const rQuery = query(collection(db, 'facilityReports'), ...rConstraints);
         const rSnap = await getDocs(rQuery);
         allReports = rSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-        const sQuery = query(collection(db, 'sanctions'), orderBy('createdAt', 'desc'), limit(QUERY_LIMIT));
+        const sQuery = query(collection(db, 'sanctions'), ...sConstraints);
         const sSnap = await getDocs(sQuery); 
         allSanctions = sSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-        const revQuery = query(collection(db, 'revenue'), limit(QUERY_LIMIT));
+        const revQuery = query(collection(db, 'revenue'), ...revConstraints);
         const revSnap = await getDocs(revQuery); 
         allRevenueManual = revSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-        const scope = getUserScope();
-
-        // Enforce user scope
-        if (scope.state) {
-            allReports = allReports.filter(r => r.state === scope.state);
-            allSanctions = allSanctions.filter(s => s.state === scope.state);
-            allRevenueManual = allRevenueManual.filter(s => s.state === scope.state);
-        } else if (scope.zone) {
-            allReports = allReports.filter(r => r.zone === scope.zone);
-            allSanctions = allSanctions.filter(s => s.zone === scope.zone);
-            allRevenueManual = allRevenueManual.filter(s => s.zone === scope.zone);
-        }
+        // In-memory sorting (newest first)
+        const getTimestamp = (val) => {
+            if (!val) return 0;
+            if (val.seconds) return val.seconds * 1000;
+            return new Date(val).getTime() || 0;
+        };
+        allReports.sort((a, b) => getTimestamp(b.createdAt) - getTimestamp(a.createdAt));
+        allSanctions.sort((a, b) => getTimestamp(b.createdAt) - getTimestamp(a.createdAt));
 
         renderDashboardUI(root, userData);
         applyFilters();
@@ -319,10 +336,10 @@ function updateDashboardMap() {
 
         pin.bindPopup(`
             <div style="font-size:12px; line-height:1.6;">
-                <b>📍 ${facility}</b><br>
-                <span style="color:#64748b;">Officer:</span> ${officer}<br>
-                <span style="color:#64748b;">Date:</span> ${date}<br>
-                <span style="color:#64748b;">GPS:</span> ${r.geoLat.toFixed(5)}, ${r.geoLng.toFixed(5)} ${accuracy}
+                <b>📍 ${escapeHtml(facility)}</b><br>
+                <span style="color:#64748b;">Officer:</span> ${escapeHtml(officer)}<br>
+                <span style="color:#64748b;">Date:</span> ${escapeHtml(date)}<br>
+                <span style="color:#64748b;">GPS:</span> ${r.geoLat.toFixed(5)}, ${r.geoLng.toFixed(5)} ${escapeHtml(accuracy)}
             </div>
         `);
         mapMarkers.push(pin);
@@ -444,10 +461,10 @@ function updateDashboardTable() {
         const d = getReportRowData(r);
         return `
         <tr style="border-bottom:1px solid var(--border-subtle); font-size:13px;">
-            <td style="padding:12px;">${d.dDate}</td>
-            <td style="padding:12px;">${d.dState} / ${d.dLga}</td>
-            <td style="padding:12px;"><span class="badge badge-blue">${d.dAct}</span></td>
-            <td style="padding:12px; font-weight:600;">${d.dFac}</td>
+            <td style="padding:12px;">${escapeHtml(d.dDate)}</td>
+            <td style="padding:12px;">${escapeHtml(d.dState)} / ${escapeHtml(d.dLga)}</td>
+            <td style="padding:12px;"><span class="badge badge-blue">${escapeHtml(d.dAct)}</span></td>
+            <td style="padding:12px; font-weight:600;">${escapeHtml(d.dFac)}</td>
             <td style="padding:12px;">${d.mopUpTotal > 0 ? `<span style="color:var(--danger);font-weight:600;">${d.mopUpTotal}</span>` : '—'}</td>
             <td style="padding:12px;">${d.holdTotal > 0 ? `<span style="color:#f59e0b;font-weight:600;">${d.holdTotal}</span>` : '—'}</td>
             <td style="padding:12px; font-weight:700;">${d.associatedRevenue > 0 ? formatCurrency(d.associatedRevenue) : '—'}</td>

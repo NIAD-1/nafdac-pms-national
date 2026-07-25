@@ -6,8 +6,8 @@
  */
 import { db, collection, addDoc, getDocs, query, where, doc, updateDoc, serverTimestamp } from "./db.js";
 import { getUserScope } from "./auth.js";
-import { clearRoot, showToast, showLoading, buildFormFields, initFormChoices } from "./ui.js";
-import { COMPLAINT_FIELDS, PRODUCT_CATEGORIES, getTodayStr } from "./constants.js";
+import { clearRoot, showToast, buildFormFields, initFormChoices } from "./ui.js";
+import { COMPLAINT_FIELDS, getTodayStr } from "./constants.js";
 
 export async function loadComplaintsPage(root, currentUser, currentUserData) {
     clearRoot(root);

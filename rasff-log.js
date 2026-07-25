@@ -7,7 +7,7 @@
 import { db, collection, addDoc, getDocs, query, where, serverTimestamp } from "./db.js";
 import { getUserScope } from "./auth.js";
 import { clearRoot, showToast, buildFormFields, initFormChoices } from "./ui.js";
-import { RASFF_FIELDS, getTodayStr } from "./constants.js";
+import { RASFF_FIELDS } from "./constants.js";
 
 export async function loadRasffPage(root, currentUser, currentUserData) {
     clearRoot(root);

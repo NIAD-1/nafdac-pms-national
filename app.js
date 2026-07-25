@@ -4,7 +4,7 @@
  * Email/Password auth with forced password change on first login.
  * ═══════════════════════════════════════════════════════════════
  */
-import { db, collection, getDocs, query, where, Timestamp, prefetchStateRegistry } from "./db.js";
+import { db, collection, getDocs, query, where, prefetchStateRegistry } from "./db.js";
 import { initAuth, signInWithEmail, sendPasswordReset, changeUserPassword, logOut, applyRoleNav, canAccessPage, getUserScope } from "./auth.js";
 import { clearRoot, showToast, showLoading } from "./ui.js";
 import { initWizard, startReportWizard } from "./wizard.js";

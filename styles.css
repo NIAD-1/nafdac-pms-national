@@ -105,34 +105,6 @@ body {
   margin-bottom: 40px;
   letter-spacing: 1px;
 }
-
-.btn-google {
-  width: 100%;
-  background: #ffffff;
-  color: var(--text-primary);
-  border: 2px solid var(--border-medium);
-  padding: 16px;
-  font-size: 15px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  cursor: pointer;
-  border-radius: var(--radius-md);
-  transition: all 0.3s;
-  font-family: inherit;
-}
-
-.btn-google:hover {
-  border-color: var(--nafdac-green);
-  background: #f0fdf4;
-  box-shadow: 0 2px 8px rgba(0, 135, 81, 0.15);
-  transform: translateY(-1px);
-}
-
-.btn-google svg { width: 22px; height: 22px; flex-shrink: 0; }
-
 /* ── App Shell ────────────────────────────────────────────────────────────── */
 #authenticatedApp {
   display: flex;

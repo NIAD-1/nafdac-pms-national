@@ -4,8 +4,8 @@
  * Admin-provisioned accounts with email/password auth.
  * ═══════════════════════════════════════════════════════════════
  */
-import { db, doc, collection, getDocs, setDoc, serverTimestamp, query, where } from "./db.js";
-import { clearRoot, showLoading, showToast } from "./ui.js";
+import { db, doc, collection, getDocs, setDoc, serverTimestamp, query } from "./db.js";
+import { clearRoot, showLoading, showToast, escapeHtml } from "./ui.js";
 import { ROLES, ZONES, ALL_STATES, getZoneForState } from "./constants.js";
 import { notifyUserApproved, createOfficerAccount } from "./auth.js";
 import { logAuditAction } from "./audit.js";
@@ -212,14 +212,14 @@ function renderTeamPage(root, userData, userLevel, users) {
                             ${users.map(u => `
                                 <tr style="border-bottom:1px solid var(--border-subtle);">
                                     <td style="padding:16px 20px;">
-                                        <strong>${u.displayName || u.email || '—'}</strong><br>
-                                        <span class="muted small">${u.email}</span>
+                                        <strong>${escapeHtml(u.displayName || u.email || '—')}</strong><br>
+                                        <span class="muted small">${escapeHtml(u.email)}</span>
                                     </td>
                                     <td style="padding:16px 20px;">
-                                        ${u.role === 'pending' ? `<span class="badge" style="background:#fff3cd; color:#856404; border:1px solid #ffeeba;">Pending Approval</span>` : `<span class="badge" style="background:var(--bg-hover); color:var(--text-primary); border:1px solid var(--border-subtle);">${ROLES[u.role]?.label || u.role}</span>`}
+                                        ${u.role === 'pending' ? `<span class="badge" style="background:#fff3cd; color:#856404; border:1px solid #ffeeba;">Pending Approval</span>` : `<span class="badge" style="background:var(--bg-hover); color:var(--text-primary); border:1px solid var(--border-subtle);">${escapeHtml(ROLES[u.role]?.label || u.role)}</span>`}
                                     </td>
                                     <td style="padding:16px 20px; color:${u.zone ? '' : 'var(--text-muted)'};">
-                                        ${u.state ? `${u.state} State` : (u.zone ? `${u.zone} Zone` : (u.role === 'pending' ? 'Unassigned' : 'National Hq'))}
+                                        ${u.state ? `${escapeHtml(u.state)} State` : (u.zone ? `${escapeHtml(u.zone)} Zone` : (u.role === 'pending' ? 'Unassigned' : 'National Hq'))}
                                     </td>
                                 </tr>
                             `).join('') || '<tr><td colspan="3" style="text-align:center; padding:30px;" class="muted">No users found.</td></tr>'}

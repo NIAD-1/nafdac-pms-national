@@ -4,14 +4,11 @@
 // ═══════════════════════════════════════════════════════════════
 import { auth, db, doc, setDoc, getDoc, collection, query, where, getDocs, serverTimestamp, limit } from "./db.js";
 import { NAV_PERMISSIONS, ROLES } from "./constants.js";
-import {
     signInWithEmailAndPassword,
     signOut,
     onAuthStateChanged,
     updatePassword,
-    sendPasswordResetEmail,
-    EmailAuthProvider,
-    reauthenticateWithCredential
+    sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
 export let currentUser = null;
@@ -243,7 +240,6 @@ export async function createOfficerAccount(email, tempPassword, profileData) {
 // ── EMAIL NOTIFICATIONS ─────────────────────────────────────────
 
 const EMAILJS_SERVICE_ID = 'service_91zhfw3';
-const EMAILJS_TEMPLATE_ID = 'template_chvc2sa';
 const EMAILJS_PUBLIC_KEY = 'kCwwP4QT_OBENGN3M';
 
 async function loadEmailJS() {
@@ -254,24 +250,6 @@ async function loadEmailJS() {
         await new Promise(r => script.onload = r);
     }
     window.emailjs.init(EMAILJS_PUBLIC_KEY);
-}
-
-async function notifyAdminNewUser(name, email) {
-    if (EMAILJS_SERVICE_ID === 'YOUR_SERVICE_ID') return;
-    try {
-        await loadEmailJS();
-        await window.emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
-            user_name: name,
-            user_email: email,
-            email: email,
-            name: name,
-            time: new Date().toLocaleString(),
-            to_email: 'enilamaoshoriamhe687@gmail.com'
-        });
-        console.log("[Notify] 📧 Admin notified of new user:", email);
-    } catch (err) {
-        console.warn("[Notify] Email notification failed:", err?.text || err?.message || err);
-    }
 }
 
 // ── USER APPROVAL / ACCOUNT CREATION EMAIL NOTIFICATION ─────────
