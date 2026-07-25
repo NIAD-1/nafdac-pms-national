@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nafdac-pms-v4';
+const CACHE_NAME = 'nafdac-pms-v5';
 const urlsToCache = [
   '/',
   '/index.html',

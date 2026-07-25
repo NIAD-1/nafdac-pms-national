@@ -29,8 +29,13 @@ export const startReportWizard = async (root) => {
         lga: '',
         inspectorNames: [],
         facilityCount: 1,
-        currentFacIndex: 0, // Paginated index tracker
-        facilities: [] 
+        currentFacIndex: 0,
+        facilities: [],
+        // GPS Location
+        geoLat: null,
+        geoLng: null,
+        geoAccuracy: null,
+        geoTimestamp: null
     };
     renderCurrentStep(root);
 };
@@ -91,6 +96,29 @@ function renderStep_Location(root) {
                 <div class="form-group" style="flex:1;">
                     <label>Facilities Visited <span style="color:var(--danger);">*</span></label>
                     <input type="number" id="wizFacilityCount" min="1" max="100" value="${wizardState.facilityCount}" required>
+                </div>
+            </div>
+
+            <!-- GPS LOCATION CAPTURE -->
+            <div style="margin-top:20px; padding:16px 20px; background:var(--bg-secondary); border:1px solid var(--border-subtle); border-radius:var(--radius-lg);">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                    <div>
+                        <label style="margin-bottom:2px; display:block;">📍 Live GPS Location</label>
+                        <div class="input-hint" style="margin:0;">Captures your exact position for report verification.</div>
+                    </div>
+                    <button type="button" id="btnCaptureGps" class="secondary" style="padding:8px 18px; font-size:13px; display:flex; align-items:center; gap:6px;">
+                        🛰️ ${wizardState.geoLat ? 'Recapture' : 'Capture Location'}
+                    </button>
+                </div>
+                <div id="gpsStatus" style="margin-top:10px;">
+                    ${wizardState.geoLat ? `
+                        <div style="display:flex; align-items:center; gap:8px; padding:8px 12px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px;">
+                            <span style="color:#16a34a; font-weight:700;">✅ Location captured</span>
+                            <span class="muted small">${wizardState.geoLat.toFixed(6)}, ${wizardState.geoLng.toFixed(6)} (±${Math.round(wizardState.geoAccuracy)}m)</span>
+                        </div>
+                    ` : `
+                        <div class="muted small" style="opacity:0.7;">No location captured yet. Click the button above.</div>
+                    `}
                 </div>
             </div>
 
@@ -180,6 +208,54 @@ function renderStep_Location(root) {
     
     if (wizardState.zone) populateStates();
     if (wizardState.state) populateOfficers(); else initFormChoices(root);
+
+    // GPS Capture Handler
+    document.getElementById('btnCaptureGps').addEventListener('click', () => {
+        const btn = document.getElementById('btnCaptureGps');
+        const statusDiv = document.getElementById('gpsStatus');
+
+        if (!navigator.geolocation) {
+            statusDiv.innerHTML = `<div style="color:var(--danger); font-size:13px;">❌ Geolocation is not supported by your browser.</div>`;
+            return;
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Acquiring signal...';
+        statusDiv.innerHTML = `<div class="muted small"><div class="spinner" style="width:16px;height:16px;display:inline-block;vertical-align:middle;margin-right:8px;"></div>Searching for GPS satellites...</div>`;
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                wizardState.geoLat = position.coords.latitude;
+                wizardState.geoLng = position.coords.longitude;
+                wizardState.geoAccuracy = position.coords.accuracy;
+                wizardState.geoTimestamp = new Date().toISOString();
+
+                statusDiv.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:8px; padding:8px 12px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px;">
+                        <span style="color:#16a34a; font-weight:700;">✅ Location captured</span>
+                        <span class="muted small">${wizardState.geoLat.toFixed(6)}, ${wizardState.geoLng.toFixed(6)} (±${Math.round(wizardState.geoAccuracy)}m)</span>
+                    </div>`;
+                btn.disabled = false;
+                btn.innerHTML = '🛰️ Recapture';
+                showToast('GPS Locked', `Location captured with ${Math.round(wizardState.geoAccuracy)}m accuracy.`, 'success', 3000);
+            },
+            (error) => {
+                const messages = {
+                    1: 'Location permission denied. Please allow location access in your browser settings.',
+                    2: 'Location unavailable. Make sure GPS is enabled on your device.',
+                    3: 'Location request timed out. Please try again in an open area.'
+                };
+                statusDiv.innerHTML = `<div style="color:var(--danger); font-size:13px;">❌ ${messages[error.code] || error.message}</div>`;
+                btn.disabled = false;
+                btn.innerHTML = '🛰️ Retry Capture';
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 15000,
+                maximumAge: 0
+            }
+        );
+    });
 
     document.getElementById('nextBtn').onclick = () => {
         const zone = zoneSelect.value;
@@ -590,6 +666,11 @@ async function submitReportBatch(root) {
                 inspectorNames: wizardState.inspectorNames,
                 conditionalData: fac.conditionalData,
                 ...fac.formData,
+                // GPS coordinates
+                geoLat: wizardState.geoLat || null,
+                geoLng: wizardState.geoLng || null,
+                geoAccuracy: wizardState.geoAccuracy || null,
+                geoTimestamp: wizardState.geoTimestamp || null,
                 createdBy: currentUser.uid,
                 createdByEmail: currentUser.email,
                 createdByName: currentUserData?.displayName || currentUser.displayName || currentUser.email,

@@ -268,28 +268,23 @@ function updateDashboardMap() {
     mapMarkers.forEach(m => dashboardMap.removeLayer(m));
     mapMarkers = [];
 
-    // Aggregate data by state
+    // ── Layer 1: State-level heat bubbles ────────────────────────
     const stateCounts = {};
     filteredReports.forEach(r => {
         if (!r.state) return;
         stateCounts[r.state] = (stateCounts[r.state] || 0) + 1;
     });
 
-    // Determine max for scaling
     let max = 1;
     Object.values(stateCounts).forEach(v => { if (v > max) max = v; });
 
-    // Plot markers
     for (const [state, count] of Object.entries(stateCounts)) {
         const coords = NIGERIAN_STATES_COORD[state];
         if (coords) {
-            // Scale radius based on ratio of max, between 8 and 30
             const radius = 8 + (22 * (count / max));
-            
-            // Color mapping based on density (hotter = more)
-            let color = '#3498db'; // blue
-            if (count > max * 0.75) color = '#e74c3c'; // red
-            else if (count > max * 0.4) color = '#f39c12'; // orange
+            let color = '#3498db';
+            if (count > max * 0.75) color = '#e74c3c';
+            else if (count > max * 0.4) color = '#f39c12';
 
             const circle = L.circleMarker(coords, {
                 radius: radius,
@@ -297,13 +292,41 @@ function updateDashboardMap() {
                 color: '#fff',
                 weight: 2,
                 opacity: 1,
-                fillOpacity: 0.7
+                fillOpacity: 0.5
             }).addTo(dashboardMap);
 
             circle.bindPopup(`<b>${state} State</b><br>${count} Activities Logged`);
             mapMarkers.push(circle);
         }
     }
+
+    // ── Layer 2: Individual GPS pins (from live captures) ────────
+    const gpsReports = filteredReports.filter(r => r.geoLat && r.geoLng);
+    gpsReports.forEach(r => {
+        const pin = L.circleMarker([r.geoLat, r.geoLng], {
+            radius: 5,
+            fillColor: '#008751',
+            color: '#fff',
+            weight: 1.5,
+            opacity: 1,
+            fillOpacity: 0.9
+        }).addTo(dashboardMap);
+
+        const date = r.inspectionDate || '—';
+        const officer = r.createdByName || r.createdByEmail || '—';
+        const facility = r.facilityName || '—';
+        const accuracy = r.geoAccuracy ? `±${Math.round(r.geoAccuracy)}m` : '';
+
+        pin.bindPopup(`
+            <div style="font-size:12px; line-height:1.6;">
+                <b>📍 ${facility}</b><br>
+                <span style="color:#64748b;">Officer:</span> ${officer}<br>
+                <span style="color:#64748b;">Date:</span> ${date}<br>
+                <span style="color:#64748b;">GPS:</span> ${r.geoLat.toFixed(5)}, ${r.geoLng.toFixed(5)} ${accuracy}
+            </div>
+        `);
+        mapMarkers.push(pin);
+    });
 }
 
 function updateDashboardMetrics() {
