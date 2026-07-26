@@ -4,6 +4,7 @@
  * Toast, modal, form builder, conditional fields, wizard progress.
  * ═══════════════════════════════════════════════════════════════
  */
+import { NAFDAC_LABS } from "./constants.js";
 
 let currentPage = 'home';
 let choicesInstances = [];
@@ -140,6 +141,25 @@ export function buildFormFields(fields, opts = {}) {
                     <option value="">Loading alerts...</option>
                 </select>
                 <div class="input-hint">Products are loaded from the active alerts database</div>`;
+                break;
+            case 'labDropdown':
+                input = `<select name="${f.name}" data-lab-dropdown="true" ${f.required ? 'required' : ''}>
+                    <option value="">Select NAFDAC Laboratory...</option>
+                    ${NAFDAC_LABS.map(lab => `<option value="${lab.name}" data-address="${lab.address}">${lab.name}</option>`).join('')}
+                </select>
+                <div class="input-hint">Official NAFDAC laboratory — address auto-fills on selection</div>`;
+                break;
+            case 'stateFacilitySearch':
+                input = `<select name="${f.name}" data-state-facility="true" data-filter-product="${f.filterByProduct ? 'true' : 'false'}" ${f.required ? 'required' : ''}>
+                    <option value="">${f.filterByProduct ? 'Select product type first...' : 'Loading facilities...'}</option>
+                </select>
+                <div id="newFacWrapper_${f.name}" style="display:none; margin-top:8px;">
+                    <input type="text" data-newfac-input="${f.name}" placeholder="Enter new facility name..." ${f.required ? 'required' : ''}>
+                </div>
+                <div class="input-hint" data-fac-hint="${f.name}">Facilities from your state will appear after selecting product type</div>`;
+                break;
+            case 'autoAddress':
+                input = `<input type="text" name="${f.name}" data-auto-address="true" placeholder="Auto-filled when facility is selected..." readonly style="background:var(--bg-tertiary); color:var(--text-secondary);">`;
                 break;
             case 'facilitySearchCombo':
                 input = `<select data-facility-search="true" ${f.required ? 'required' : ''}>

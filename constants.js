@@ -36,6 +36,15 @@ export const PRODUCT_CATEGORIES = [
     "Vaccines & Biologics", "Chemicals", "Herbals", "Water"
 ];
 
+// ── OFFICIAL NAFDAC LABORATORIES ─────────────────────────────────
+export const NAFDAC_LABS = [
+    { name: "NAFDAC Central Drug Control Laboratory (CDL), Yaba", address: "Edmund Crescent, Medical Compound, Yaba, Lagos State" },
+    { name: "NAFDAC Zonal Laboratory, Kaduna",                    address: "14B Kanta Road, Kaduna, Kaduna State" },
+    { name: "NAFDAC Zonal Laboratory, Agulu",                     address: "Agulu Industrial Zone, Anaocha LGA, Anambra State" },
+    { name: "NAFDAC Zonal Laboratory, Maiduguri",                 address: "Kashim Ibrahim Way, Maiduguri, Borno State" },
+    { name: "NAFDAC Food & Drug Laboratory, Oshodi",              address: "3/5 Oshodi-Apapa Expressway, Oshodi, Lagos State" }
+];
+
 // ── ROLES & PERMISSIONS ─────────────────────────────────────────
 export const ROLES = {
     pending:           { label: "Pending Approval",     level: 0 },
@@ -69,8 +78,8 @@ export const DAILY_ACTIVITIES = {
         category: "surveillance",
         fields: [
             { name: "productCategory", label: "Product Type", type: "multiselect", options: PRODUCT_CATEGORIES, required: true },
-            { name: "facilityName", label: "Facility Name", type: "text", required: true },
-            { name: "facilityAddress", label: "Facility Address", type: "text", required: true },
+            { name: "facilityName", label: "Facility Name", type: "stateFacilitySearch", required: true, filterByProduct: true },
+            { name: "facilityAddress", label: "Facility Address", type: "autoAddress" },
             { name: "actionTaken", label: "Action Taken / Remarks", type: "textarea" }
         ],
         conditionals: [
@@ -117,8 +126,8 @@ export const DAILY_ACTIVITIES = {
         category: "surveillance",
         fields: [
             { name: "productCategory", label: "Product Type", type: "multiselect", options: PRODUCT_CATEGORIES, required: true },
-            { name: "facilityName", label: "Facility Name", type: "text", required: true },
-            { name: "facilityAddress", label: "Facility Address", type: "text", required: true },
+            { name: "facilityName", label: "Facility Name", type: "stateFacilitySearch", required: true, filterByProduct: true },
+            { name: "facilityAddress", label: "Facility Address", type: "autoAddress" },
             { name: "actionTaken", label: "Action Taken / Remarks", type: "textarea" }
         ],
         conditionals: [
@@ -157,8 +166,8 @@ export const DAILY_ACTIVITIES = {
         category: "surveillance",
         fields: [
             { name: "productCategory", label: "Product Type", type: "multiselect", options: PRODUCT_CATEGORIES, required: true },
-            { name: "facilityName", label: "Facility Name", type: "text", required: true },
-            { name: "facilityAddress", label: "Facility Address", type: "text", required: true },
+            { name: "facilityName", label: "Facility Name", type: "stateFacilitySearch", required: true },
+            { name: "facilityAddress", label: "Facility Address", type: "autoAddress" },
             { name: "actionTaken", label: "Action Taken / Remarks", type: "textarea" }
         ],
         conditionals: [
@@ -197,8 +206,8 @@ export const DAILY_ACTIVITIES = {
         category: "inspections",
         fields: [
             { name: "gsdpSubtype", label: "Inspection Type", type: "select", options: ["GDP Inspection", "CEVI Inspection"], required: true },
-            { name: "facilityName", label: "Facility Name", type: "text", required: true },
-            { name: "facilityAddress", label: "Facility Address", type: "text", required: true },
+            { name: "facilityName", label: "Facility Name", type: "stateFacilitySearch", required: true },
+            { name: "facilityAddress", label: "Facility Address", type: "autoAddress" },
             { name: "riskCategory", label: "Risk Categorization", type: "select", options: ["High Risk", "Medium Risk", "Low Risk"], required: true },
             { name: "activitiesCarriedOut", label: "Activities Carried Out", type: "textarea", required: true },
             { name: "remarks", label: "Remarks", type: "textarea" }
@@ -211,8 +220,8 @@ export const DAILY_ACTIVITIES = {
         category: "surveillance",
         fields: [
             { name: "productCategory", label: "Product Type", type: "multiselect", options: PRODUCT_CATEGORIES, required: true },
-            { name: "facilityName", label: "Facility Name", type: "text" },
-            { name: "facilityAddress", label: "Facility Address", type: "text" },
+            { name: "facilityName", label: "NAFDAC Laboratory", type: "labDropdown", required: true },
+            { name: "facilityAddress", label: "Lab Address", type: "autoAddress" },
             { name: "samplesTaken", label: "No. of Samples Taken", type: "number", required: true },
             { name: "remarks", label: "Remarks", type: "textarea" }
         ]
@@ -225,6 +234,7 @@ export const DAILY_ACTIVITIES = {
         fields: [
             { name: "sourceActivity", label: "Source Activity", type: "select", options: ["Routine Surveillance", "Consumer Complaint", "GLSI Monitoring", "GSDP / CEVI", "Lab Report", "RASFF", "Adverts"], required: true },
             { name: "facilityName", label: "Facility Name", type: "facilitySearchCombo", required: true },
+            { name: "facilityAddress", label: "Facility Address", type: "autoAddress" },
             { name: "outcome", label: "Meeting Outcome / Resolutions", type: "textarea", required: true },
             { name: "actionTaken", label: "Action Taken / Remarks", type: "textarea" }
         ],

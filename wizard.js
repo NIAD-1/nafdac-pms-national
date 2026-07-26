@@ -8,7 +8,7 @@
  */
 import { db, collection, addDoc, getDocs, query, where, serverTimestamp, upsertFacility } from "./db.js";
 import { clearRoot, showLoading, showToast, buildFormFields, renderWizardProgress, validateForm, renderConditionalFields, initFormChoices } from "./ui.js";
-import { ZONES, DAILY_ACTIVITIES, DAILY_ACTIVITY_KEYS, LGA_BY_STATE, getTodayStr } from "./constants.js";
+import { ZONES, DAILY_ACTIVITIES, DAILY_ACTIVITY_KEYS, LGA_BY_STATE, getTodayStr, NAFDAC_LABS } from "./constants.js";
 import { logAuditAction } from "./audit.js";
 
 let currentUser = null;
@@ -359,27 +359,24 @@ function renderStep_Details(root) {
         const actDef = DAILY_ACTIVITIES[key];
         
         let fieldsHtml = '';
-        const hasFacility = actDef.fields.some(f => f.name === 'facilityName');
-        const hasAddress = actDef.fields.some(f => f.name === 'facilityAddress');
+        // Separate facility fields (rendered as a special paired row) from other fields
+        const facilityNameField = actDef.fields.find(f => f.name === 'facilityName');
+        const facilityAddrField = actDef.fields.find(f => f.name === 'facilityAddress');
         const otherFields = actDef.fields.filter(f => f.name !== 'facilityName' && f.name !== 'facilityAddress' && f.name !== 'actionTaken' && f.name !== 'remarks');
         const actionFields = actDef.fields.filter(f => f.name === 'actionTaken' || f.name === 'remarks');
 
-        if (hasFacility || hasAddress) {
-            const facField = actDef.fields.find(f => f.name === 'facilityName');
-            const addrField = actDef.fields.find(f => f.name === 'facilityAddress');
-            fieldsHtml += `
-            <div class="form-row" style="margin-top:16px;">
-                <div class="form-group" style="flex:1;">
-                    <label style="color:var(--primary); font-weight:700;">FACILITY NAME ${facField?.required ? '<span style="color:var(--danger);">*</span>' : ''}</label>
-                    <input type="text" name="facilityName" placeholder="${facField?.placeholder || ''}" ${facField?.required ? 'required' : ''}>
-                </div>
-                <div class="form-group" style="flex:1;">
-                    <label style="color:var(--primary); font-weight:700;">FACILITY ADDRESS ${addrField?.required ? '<span style="color:var(--danger);">*</span>' : ''}</label>
-                    <input type="text" name="facilityAddress" placeholder="${addrField?.placeholder || ''}" ${addrField?.required ? 'required' : ''}>
-                </div>
-            </div>`;
-        }
+        // Render non-facility fields first (e.g. productCategory, sourceActivity, gsdpSubtype)
         fieldsHtml += buildFormFields(otherFields, { labelStyle: 'color:var(--primary); font-weight:700;' });
+
+        // Render facility name + address as a paired row
+        if (facilityNameField) {
+            const nameHtml = buildFormFields([facilityNameField], { labelStyle: 'color:var(--primary); font-weight:700;' });
+            const addrHtml = facilityAddrField 
+                ? buildFormFields([facilityAddrField], { labelStyle: 'color:var(--primary); font-weight:700;' })
+                : '';
+            fieldsHtml += `<div class="form-row" style="margin-top:4px;">${nameHtml}${addrHtml}</div>`;
+        }
+
         if (actDef.conditionals) fieldsHtml += renderConditionalFields(actDef.conditionals);
         
         // Append Action Taken / Remarks at the absolute bottom
@@ -393,7 +390,163 @@ function renderStep_Details(root) {
         initFormChoices(block);
         populateAlertDropdowns(block);
 
-        // -- Contextual Facility Linker (Consultative Meetings) --
+        // ═══════════════════════════════════════════════════════════
+        // SMART FACILITY WIRING — Lab, State Search, Consultative
+        // ═══════════════════════════════════════════════════════════
+
+        // Helper: fill autoAddress field in the same form
+        const fillAddress = (container, address) => {
+            const addrInput = container.querySelector('[data-auto-address="true"]');
+            if (addrInput) {
+                addrInput.value = address || '';
+                addrInput.style.background = address ? 'var(--bg-tertiary)' : '';
+            }
+        };
+
+        // Helper: populate a facility select with options + Add New
+        const populateFacSelect = (selectEl, facilities, fieldName) => {
+            const wrapper = block.querySelector(`#newFacWrapper_${fieldName}`);
+            const newInput = block.querySelector(`[data-newfac-input="${fieldName}"]`);
+
+            if (!facilities || facilities.length === 0) {
+                selectEl.innerHTML = '<option value="__ADD_NEW__">No facilities found — + Add New...</option>';
+                if (wrapper) wrapper.style.display = 'block';
+                if (newInput) { newInput.setAttribute('name', fieldName); newInput.placeholder = 'Enter facility name...'; }
+                selectEl.removeAttribute('name');
+                return;
+            }
+
+            let html = '<option value="">Select Facility...</option>';
+            facilities.sort((a, b) => a.name.localeCompare(b.name));
+            html += facilities.map(f => `<option value="${f.name}" data-address="${f.address || ''}">${f.name}</option>`).join('');
+            html += '<option value="__ADD_NEW__" style="font-weight:bold; color:var(--primary);">+ Add New Facility...</option>';
+            selectEl.innerHTML = html;
+
+            // Restore saved value
+            if (fac.formData[fieldName]) {
+                const saved = fac.formData[fieldName];
+                const matchOpt = Array.from(selectEl.options).find(o => o.value === saved);
+                if (matchOpt) {
+                    selectEl.value = saved;
+                    fillAddress(block, matchOpt.dataset.address || '');
+                } else {
+                    selectEl.value = '__ADD_NEW__';
+                    if (wrapper) wrapper.style.display = 'block';
+                    if (newInput) { newInput.setAttribute('name', fieldName); newInput.value = saved; }
+                    selectEl.removeAttribute('name');
+                }
+            }
+        };
+
+        // ── 1) LAB DROPDOWN ──────────────────────────────────────
+        const labSel = block.querySelector('[data-lab-dropdown="true"]');
+        if (labSel) {
+            labSel.addEventListener('change', () => {
+                const opt = labSel.selectedOptions[0];
+                fillAddress(block, opt?.dataset?.address || '');
+            });
+            // Restore on re-render
+            if (fac.formData.facilityName) {
+                labSel.value = fac.formData.facilityName;
+                const lab = NAFDAC_LABS.find(l => l.name === fac.formData.facilityName);
+                if (lab) fillAddress(block, lab.address);
+            }
+        }
+
+        // ── 2) STATE FACILITY SEARCH ─────────────────────────────
+        const stateFacSel = block.querySelector('[data-state-facility="true"]');
+        if (stateFacSel) {
+            const filterByProduct = stateFacSel.dataset.filterProduct === 'true';
+            const fieldName = stateFacSel.getAttribute('name');
+            const wrapper = block.querySelector(`#newFacWrapper_${fieldName}`);
+            const newInput = block.querySelector(`[data-newfac-input="${fieldName}"]`);
+
+            // Facility search function
+            const loadFacilities = async (productTypes) => {
+                stateFacSel.innerHTML = '<option value="">Searching facilities...</option>';
+                try {
+                    const q2 = query(
+                        collection(db, 'facilityReports'),
+                        where('state', '==', wizardState.state),
+                        where('activityType', '==', actDef.label)
+                    );
+                    const snap = await getDocs(q2);
+                    const facilityMap = new Map();
+                    snap.forEach(d => {
+                        const rec = d.data();
+                        if (!rec.facilityName) return;
+                        // For product-filtered activities, check if any product category matches
+                        if (filterByProduct && productTypes && productTypes.length > 0) {
+                            const recCats = Array.isArray(rec.productCategory) ? rec.productCategory : [rec.productCategory];
+                            const hasMatch = productTypes.some(pt => recCats.includes(pt));
+                            if (!hasMatch) return;
+                        }
+                        if (!facilityMap.has(rec.facilityName)) {
+                            facilityMap.set(rec.facilityName, { name: rec.facilityName, address: rec.facilityAddress || '' });
+                        }
+                    });
+                    populateFacSelect(stateFacSel, Array.from(facilityMap.values()), fieldName);
+                } catch (err) {
+                    console.error('Facility search error:', err);
+                    stateFacSel.innerHTML = '<option value="__ADD_NEW__">⚠️ Error loading — + Add manually...</option>';
+                    if (wrapper) wrapper.style.display = 'block';
+                    if (newInput) { newInput.setAttribute('name', fieldName); }
+                    stateFacSel.removeAttribute('name');
+                }
+            };
+
+            // Handle facility selection → auto-fill address
+            stateFacSel.addEventListener('change', () => {
+                if (stateFacSel.value === '__ADD_NEW__') {
+                    if (wrapper) wrapper.style.display = 'block';
+                    if (newInput) { newInput.setAttribute('name', fieldName); newInput.focus(); }
+                    stateFacSel.removeAttribute('name');
+                    fillAddress(block, '');
+                    // Make address editable for new facilities
+                    const addrInput = block.querySelector('[data-auto-address="true"]');
+                    if (addrInput) { addrInput.removeAttribute('readonly'); addrInput.style.background = ''; addrInput.style.color = ''; addrInput.placeholder = 'Enter facility address...'; }
+                } else {
+                    if (wrapper) wrapper.style.display = 'none';
+                    if (newInput) newInput.removeAttribute('name');
+                    stateFacSel.setAttribute('name', fieldName);
+                    const opt = stateFacSel.selectedOptions[0];
+                    fillAddress(block, opt?.dataset?.address || '');
+                    // Keep address read-only for existing
+                    const addrInput = block.querySelector('[data-auto-address="true"]');
+                    if (addrInput) { addrInput.setAttribute('readonly', ''); addrInput.style.background = 'var(--bg-tertiary)'; addrInput.style.color = 'var(--text-secondary)'; }
+                }
+            });
+
+            if (filterByProduct) {
+                // Watch for product category multiselect changes
+                const productSel = block.querySelector('[name="productCategory"]');
+                if (productSel) {
+                    const triggerLoad = () => {
+                        let selected = [];
+                        if (productSel._choicesInstance) {
+                            selected = productSel._choicesInstance.getValue(true);
+                        } else {
+                            selected = Array.from(productSel.selectedOptions || []).map(o => o.value);
+                        }
+                        if (selected.length > 0) {
+                            loadFacilities(selected);
+                        } else {
+                            stateFacSel.innerHTML = '<option value="">Select product type first...</option>';
+                        }
+                    };
+                    productSel.addEventListener('change', triggerLoad);
+                    // Auto-trigger if product types already saved
+                    if (fac.formData.productCategory && fac.formData.productCategory.length > 0) {
+                        setTimeout(() => loadFacilities(Array.isArray(fac.formData.productCategory) ? fac.formData.productCategory : [fac.formData.productCategory]), 100);
+                    }
+                }
+            } else {
+                // No product filter — load all state facilities for this activity type
+                loadFacilities(null);
+            }
+        }
+
+        // ── 3) CONSULTATIVE MEETING — Source Activity Linker ──────
         const srcActSel = block.querySelector('[name="sourceActivity"]');
         const facNameSel = block.querySelector('[data-facility-search="true"]');
         const newFacWrapper = block.querySelector('#newFacWrapper');
@@ -407,36 +560,44 @@ function renderStep_Details(root) {
                     newFacWrapper.style.display = 'none';
                     newFacInput.removeAttribute('name');
                     facNameSel.setAttribute('name', 'facilityName');
+                    fillAddress(block, '');
                     return;
                 }
-                facNameSel.innerHTML = '<option value="">Searching Local Cache...</option>';
+                facNameSel.innerHTML = '<option value="">Searching facilities...</option>';
                 try {
                     const q2 = query(collection(db, "facilityReports"), where("state", "==", wizardState.state), where("activityType", "==", chosenSource));
                     const snap = await getDocs(q2);
                     
-                    let uniqueFacs = new Set();
+                    const facilityMap = new Map();
                     snap.forEach(d => {
                         const rec = d.data();
-                        if (rec.facilityName) uniqueFacs.add(rec.facilityName);
+                        if (rec.facilityName && !facilityMap.has(rec.facilityName)) {
+                            facilityMap.set(rec.facilityName, { name: rec.facilityName, address: rec.facilityAddress || '' });
+                        }
                     });
                     
-                    if (snap.empty) {
-                        facNameSel.innerHTML = '<option value="__ADD_NEW__">⚠️ Offline: No Cached Records. + Add New...</option>';
+                    if (facilityMap.size === 0) {
+                        facNameSel.innerHTML = '<option value="__ADD_NEW__">⚠️ No records found. + Add New...</option>';
                         newFacWrapper.style.display = 'block';
                         facNameSel.removeAttribute('name');
                         newFacInput.setAttribute('name', 'facilityName');
                         newFacInput.placeholder = "Enter name manually...";
+                        fillAddress(block, '');
+                        const addrInput = block.querySelector('[data-auto-address="true"]');
+                        if (addrInput) { addrInput.removeAttribute('readonly'); addrInput.style.background = ''; addrInput.style.color = ''; addrInput.placeholder = 'Enter facility address...'; }
                     } else {
                         let optionsHtml = '<option value="">Select Facility...</option>';
-                        optionsHtml += Array.from(uniqueFacs).sort().map(fn => `<option value="${fn}">${fn}</option>`).join('');
+                        const sorted = Array.from(facilityMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+                        optionsHtml += sorted.map(f => `<option value="${f.name}" data-address="${f.address}">${f.name}</option>`).join('');
                         optionsHtml += '<option value="__ADD_NEW__" style="font-weight:bold; color:var(--primary);">+ Add New Facility...</option>';
                         
                         facNameSel.innerHTML = optionsHtml;
 
                         // restore value if we have one
                         if (fac.formData.facilityName) {
-                            if (uniqueFacs.has(fac.formData.facilityName)) {
+                            if (facilityMap.has(fac.formData.facilityName)) {
                                 facNameSel.value = fac.formData.facilityName;
+                                fillAddress(block, facilityMap.get(fac.formData.facilityName).address);
                             } else {
                                 facNameSel.value = "__ADD_NEW__";
                                 newFacWrapper.style.display = 'block';
@@ -459,10 +620,17 @@ function renderStep_Details(root) {
                     facNameSel.removeAttribute('name');
                     newFacInput.setAttribute('name', 'facilityName');
                     newFacInput.focus();
+                    fillAddress(block, '');
+                    const addrInput = block.querySelector('[data-auto-address="true"]');
+                    if (addrInput) { addrInput.removeAttribute('readonly'); addrInput.style.background = ''; addrInput.style.color = ''; addrInput.placeholder = 'Enter facility address...'; }
                 } else {
                     newFacWrapper.style.display = 'none';
                     facNameSel.setAttribute('name', 'facilityName');
                     newFacInput.removeAttribute('name');
+                    const opt = facNameSel.selectedOptions[0];
+                    fillAddress(block, opt?.dataset?.address || '');
+                    const addrInput = block.querySelector('[data-auto-address="true"]');
+                    if (addrInput) { addrInput.setAttribute('readonly', ''); addrInput.style.background = 'var(--bg-tertiary)'; addrInput.style.color = 'var(--text-secondary)'; }
                 }
             });
 

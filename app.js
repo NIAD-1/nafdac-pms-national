@@ -185,6 +185,58 @@ async function renderHomePage() {
         } catch (e) { console.error(e); }
     }
 
+    // Fetch active Watchlist items
+    let watchlistHtml = '';
+    try {
+        const alertSnap = await getDocs(query(collection(db, 'alerts')));
+        const activeAlerts = alertSnap.docs
+            .map(d => ({ id: d.id, itemType: 'product_alert', scope: 'nationwide', approvalStatus: 'approved', ...d.data() }))
+            .filter(a => {
+                if (a.approvalStatus && a.approvalStatus !== 'approved') return false;
+                if (a.scope === 'nationwide') return true;
+                if (a.scope === 'selected_states' && scope.state) return Array.isArray(a.targetStates) && a.targetStates.includes(scope.state);
+                if (a.scope === 'zone' && scope.zone) return a.zone === scope.zone;
+                if (scope.state) return a.state === scope.state || (!a.state && !a.zone);
+                return true;
+            });
+
+        if (activeAlerts.length > 0) {
+            watchlistHtml = `
+            <div class="card" style="margin-top: 24px; border-left: 4px solid var(--primary);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                    <div>
+                        <h3 style="margin:0; font-size:18px; display:flex; align-items:center; gap:8px;">
+                            🎯 Active Watchlist & Enforcement Alerts
+                            <span class="badge badge-green" style="font-size:12px;">${activeAlerts.length} Active</span>
+                        </h3>
+                        <p class="muted small" style="margin:4px 0 0 0;">Priority surveillance items requiring active monitoring in your area.</p>
+                    </div>
+                    <button class="secondary" style="font-size:12px; padding:6px 14px;" onclick="window.dispatchEvent(new CustomEvent('navigate', { detail: 'alerts' }))">
+                        View All →
+                    </button>
+                </div>
+                <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:12px;">
+                    ${activeAlerts.slice(0, 4).map(a => {
+                        const typeLabels = { product_alert: '🚨 Product Alert', recall: '⚠️ Recall', advert_watch: '📺 Advert Watch', rasff: '🌐 RASFF' };
+                        const title = a.productName || a.title || a.companyName || 'Watchlist Item';
+                        return `
+                        <div style="background:var(--bg-tertiary); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:14px;">
+                            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+                                <span class="badge badge-yellow" style="font-size:11px;">${typeLabels[a.itemType] || '🎯 Alert'}</span>
+                                <span class="muted small">${a.scope === 'nationwide' ? '🇳🇬 Nationwide' : (a.state || a.zone || 'Local')}</span>
+                            </div>
+                            <h4 style="margin:0 0 4px 0; font-size:15px; color:var(--text-main);">${title}</h4>
+                            ${a.manufacturer ? `<p class="muted small" style="margin:0 0 8px 0;">Mfg: ${a.manufacturer}</p>` : ''}
+                            ${a.reason ? `<p class="muted small" style="margin:0; font-size:12px; line-clamp:2; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${a.reason}</p>` : ''}
+                        </div>`;
+                    }).join('')}
+                </div>
+            </div>`;
+        }
+    } catch (e) {
+        console.error("Home Watchlist fetch error:", e);
+    }
+
     const hour = new Date().getHours();
     const greeting = hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : 'Evening';
 
@@ -208,6 +260,8 @@ async function renderHomePage() {
                 <div class="stat-card-value">${monthCount}</div>
             </div>
         </div>
+
+        ${watchlistHtml}
 
         <!-- Quick Actions -->
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 24px;">
