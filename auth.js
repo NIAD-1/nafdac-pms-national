@@ -4,11 +4,14 @@
 // ═══════════════════════════════════════════════════════════════
 import { auth, db, doc, setDoc, getDoc, collection, query, where, getDocs, serverTimestamp, limit } from "./db.js";
 import { NAV_PERMISSIONS, ROLES } from "./constants.js";
+import {
     signInWithEmailAndPassword,
     signOut,
     onAuthStateChanged,
     updatePassword,
-    sendPasswordResetEmail
+    sendPasswordResetEmail,
+    EmailAuthProvider,
+    reauthenticateWithCredential
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
 export let currentUser = null;
@@ -136,9 +139,15 @@ export async function signInWithEmail(email, password) {
     }
 }
 
-export async function changeUserPassword(newPassword) {
+export async function changeUserPassword(newPassword, currentPassword = '') {
     if (!auth.currentUser) throw new Error("Not authenticated.");
     if (newPassword.length < 8) throw new Error("Password must be at least 8 characters.");
+
+    if (currentPassword) {
+        const credential = EmailAuthProvider.credential(auth.currentUser.email, currentPassword);
+        await reauthenticateWithCredential(auth.currentUser, credential);
+    }
+
     await updatePassword(auth.currentUser, newPassword);
 
     // Clear the mustChangePassword flag in Firestore

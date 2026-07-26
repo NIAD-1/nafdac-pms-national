@@ -171,14 +171,22 @@
         <!-- Section: Intelligence -->
         <div class="nav-section-label" data-nav-section="alerts">Intelligence</div>
         <div id="navIntel">
-          <button class="nav-btn" data-target="alerts" data-nav="alerts">🚨 Alerts</button>
+          <button class="nav-btn" data-target="alerts" data-nav="alerts">🎯 Watchlist</button>
           <button class="nav-btn" data-target="dashboard" data-nav="dashboard">📊 Dashboard</button>
           <button class="nav-btn" data-target="compliance" data-nav="compliance">🗺️ Compliance</button>
         </div>
 
         <!-- User Info -->
         <div id="userInfo" style="margin-top:auto;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+            <button id="notificationBell" class="notification-bell" title="Action alerts" type="button" aria-label="Open action alerts">
+              🔔
+              <span id="notificationBadge" class="notification-badge hidden">0</span>
+            </button>
+            <button id="profileShortcut" class="profile-shortcut" title="My Profile" type="button" aria-label="Open my profile">👤</button>
+          </div>
           <div id="userName" style="font-size: 13px; font-weight: 600;">Director</div>
+          <div id="userRole" style="font-size: 11px; color: rgba(255,255,255,0.55);">National Admin</div>
         </div>
         <button id="btnSignOut" class="secondary" style="padding: 10px 16px; font-size: 12px;">Sign Out</button>
       </div>
@@ -187,10 +195,12 @@
     <main id="app"></main>
   </div>
 
+  <div id="notificationPanel" class="notification-panel hidden"></div>
   <div id="modalContainer"></div>
   <div id="toastContainer" class="toast-container"></div>
 
   <script src="particles.js"></script>
+  <script src="local-config.js"></script>
   <script type="module" src="app.js"></script>
 
   <!-- PWA Service Worker & App Installation Handler -->

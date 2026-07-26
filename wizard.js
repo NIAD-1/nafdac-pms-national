@@ -685,6 +685,37 @@ async function submitReportBatch(root) {
             const dr = await addDoc(collection(db, 'facilityReports'), report);
             await logAuditAction('DAILY_ACTIVITY_LOGGED', 'facilityReports', dr.id, { activityType: report.activityType, facility: report.facilityName }, currentUser);
 
+            if (
+                report.activityKey === 'routine_surveillance' &&
+                report.conditionalData?.alertSurveillanceConducted === 'yes' &&
+                report.alertProduct
+            ) {
+                try {
+                    const watchSnap = await getDocs(query(collection(db, 'alerts'), where('productName', '==', report.alertProduct)));
+                    const watchDoc = watchSnap.docs[0];
+                    await addDoc(collection(db, 'watchlistResponses'), {
+                        watchlistItemId: watchDoc?.id || '',
+                        watchlistTitle: report.alertProduct,
+                        outcome: report.alertProductOutcome || 'Checked - Not Found',
+                        details: report.alertProductDetails || '',
+                        facilityReportId: dr.id,
+                        facilityName: report.facilityName || '',
+                        facilityAddress: report.facilityAddress || '',
+                        zone: report.zone,
+                        state: report.state,
+                        lga: report.lga,
+                        inspectionDate: report.inspectionDate,
+                        inspectorNames: report.inspectorNames || [],
+                        createdBy: currentUser.uid,
+                        createdByEmail: currentUser.email,
+                        createdByName: currentUserData?.displayName || currentUser.displayName || currentUser.email,
+                        createdAt: serverTimestamp()
+                    });
+                } catch (err) {
+                    console.error("Watchlist response log err:", err);
+                }
+            }
+
             if (report.facilityName) {
                 try {
                     await upsertFacility({
@@ -741,17 +772,31 @@ async function populateAlertDropdowns(container) {
     if (!selects.length) return;
     try {
         const snap = await getDocs(query(collection(db, 'alerts')));
-        const alerts = snap.docs.map(d => d.data());
+        const alerts = snap.docs
+            .map(d => ({ id: d.id, itemType: 'product_alert', scope: 'nationwide', approvalStatus: 'approved', ...d.data() }))
+            .filter(a => {
+                if (a.approvalStatus && a.approvalStatus !== 'approved') return false;
+                if (a.scope === 'nationwide') return true;
+                if (a.scope === 'selected_states') return Array.isArray(a.targetStates) && a.targetStates.includes(wizardState.state);
+                if (a.scope === 'zone') return a.zone === wizardState.zone;
+                return a.state === wizardState.state || (!a.state && !a.zone);
+            });
         selects.forEach(sel => {
             const currentVal = sel.value;
-            sel.innerHTML = '<option value="">Select from active alerts...</option>' + 
+            sel.innerHTML = '<option value="">Select from active watchlist...</option>' + 
                 alerts.map(a => {
-                    const title = a.productName || a.title || 'Unnamed Alert Product';
-                    return `<option value="${title}" ${currentVal === title ? 'selected' : ''}>${title}</option>`;
+                    const title = a.productName || a.title || a.companyName || 'Unnamed Watchlist Item';
+                    const type = ({
+                        product_alert: 'Alert',
+                        recall: 'Recall',
+                        advert_watch: 'Advert',
+                        rasff: 'RASFF'
+                    })[a.itemType] || 'Alert';
+                    return `<option value="${title}" ${currentVal === title ? 'selected' : ''}>${type}: ${title}</option>`;
                 }).join('');
         });
     } catch (e) {
-        console.error("Alerts load error:", e);
-        selects.forEach(sel => sel.innerHTML = '<option value="">Error loading alerts</option>');
+        console.error("Watchlist load error:", e);
+        selects.forEach(sel => sel.innerHTML = '<option value="">Error loading watchlist</option>');
     }
 }

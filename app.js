@@ -17,6 +17,8 @@ import { loadMeetingsPage } from "./meetings-qms.js";
 import { loadRevenuePage } from "./revenue.js";
 import { loadAlertsPage } from "./alerts.js";
 import { loadTeamPage } from "./team.js";
+import { loadProfilePage } from "./profile.js";
+import { initNotificationCenter, refreshNotificationBell } from "./notifications.js";
 import { ZONES, ALL_STATES, DAILY_ACTIVITIES, getZoneForState, formatCurrency, getCurrentMonth, getCurrentYear, getMonthName } from "./constants.js";
 
 const root = document.getElementById('app');
@@ -108,6 +110,9 @@ async function navigate(page) {
             break;
         case 'team':
             await loadTeamPage(root, currentUser, currentUserData);
+            break;
+        case 'profile':
+            await loadProfilePage(root, currentUser, currentUserData);
             break;
         case 'compliance':
             await renderCompliancePage();
@@ -219,7 +224,7 @@ async function renderHomePage() {
             <div class="card" style="cursor:pointer; text-align:center; padding: 28px;" onclick="window.dispatchEvent(new CustomEvent('navigate', { detail: 'log-complaints' }))">
                 <div style="font-size:36px; margin-bottom:8px;">📝</div>
                 <h3 style="font-size:14px;">Log Complaints</h3>
-                <p class="muted small">Consumer complaints</p>
+                <p class="muted small">Track response tasks</p>
             </div>
             <div class="card" style="cursor:pointer; text-align:center; padding: 28px;" onclick="window.dispatchEvent(new CustomEvent('navigate', { detail: 'revenue' }))">
                 <div style="font-size:36px; margin-bottom:8px;">💰</div>
@@ -234,9 +239,9 @@ async function renderHomePage() {
             </div>` : ''}
             ${canAccessPage(currentUserData.role, 'alerts') ? `
             <div class="card" style="cursor:pointer; text-align:center; padding: 28px;" onclick="window.dispatchEvent(new CustomEvent('navigate', { detail: 'alerts' }))">
-                <div style="font-size:36px; margin-bottom:8px;">🚨</div>
-                <h3 style="font-size:14px;">Alerts</h3>
-                <p class="muted small">Product alerts intel</p>
+                <div style="font-size:36px; margin-bottom:8px;">🎯</div>
+                <h3 style="font-size:14px;">Watchlist</h3>
+                <p class="muted small">Alerts, recalls, adverts</p>
             </div>` : ''}
         </div>
     </div>`;
@@ -302,12 +307,31 @@ async function renderCompliancePage() {
 
 // ── EVENT LISTENERS ─────────────────────────────────────────────
 window.addEventListener('navigate', (e) => navigate(e.detail));
+window.addEventListener('push-message-received', (e) => {
+    const { targetPage, targetId } = e.detail || {};
+    if (targetId) sessionStorage.setItem('focusComplaintId', targetId);
+    if (targetPage) refreshNotificationBell();
+});
+
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data?.type !== 'PUSH_NAVIGATE') return;
+        if (event.data.targetId) sessionStorage.setItem('focusComplaintId', event.data.targetId);
+        if (event.data.targetPage) navigate(event.data.targetPage);
+    });
+}
+
+const pushParams = new URLSearchParams(window.location.search);
+const pushTarget = pushParams.get('pushTarget');
+const pushTargetId = pushParams.get('targetId');
+if (pushTargetId) sessionStorage.setItem('focusComplaintId', pushTargetId);
 
 document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.onclick = (e) => navigate(e.target.dataset.target || e.target.closest('.nav-btn').dataset.target);
 });
 
 document.getElementById('btnSignOut').onclick = logOut;
+document.getElementById('profileShortcut')?.addEventListener('click', () => navigate('profile'));
 
 // ── LOGIN FORM HANDLER ──────────────────────────────────────────
 const loginForm = document.getElementById('loginForm');
@@ -461,15 +485,21 @@ initAuth(db, (user, userData) => {
             // ✅ Full access — show the app
             showScreen('app');
             userNameDisplay.textContent = userData.displayName || user.email;
+            const userRoleDisplay = document.getElementById('userRole');
+            if (userRoleDisplay) {
+                userRoleDisplay.textContent = [userData.state, userData.zone, userData.role].filter(Boolean).join(' • ') || 'Officer';
+            }
             applyRoleNav(userData.role);
+            initNotificationCenter(user, userData);
 
             if (userData.state) {
                 prefetchStateRegistry(userData.state);
             }
 
             initWizard(user, userData);
-            navigate('home');
+            navigate(pushTarget || 'home');
             resetSessionTimer(); // Start inactivity countdown
+            refreshNotificationBell();
             showToast('Welcome Back', `Signed in as ${userData.displayName || user.email}`, 'success', 3000);
         } else {
             // ⛔ Not approved — deny access

@@ -26,6 +26,10 @@ export const getZoneForState = (state) => {
     return null;
 };
 
+// Firebase Cloud Messaging public Web Push certificate key.
+// Replace this with the project's Firebase Console > Cloud Messaging > Web Push certificate key.
+export const FCM_VAPID_KEY = globalThis.NAFDAC_PMS_CONFIG?.FCM_VAPID_KEY || "";
+
 // ── PRODUCT CATEGORIES ──────────────────────────────────────────
 export const PRODUCT_CATEGORIES = [
     "Drugs", "Food", "Cosmetics", "Medical Devices",
@@ -45,13 +49,13 @@ export const ROLES = {
 
 // Navigation sections visible per role
 export const NAV_PERMISSIONS = {
-    pending:           ['home'],
-    field_officer:     ['home', 'activity', 'facilities', 'log-complaints', 'log-adverts', 'log-meetings', 'log-rasff'],
-    inspector:         ['home', 'activity', 'facilities', 'log-complaints'],
-    state_coordinator: ['home', 'activity', 'facilities', 'log-complaints', 'log-adverts', 'log-meetings', 'log-rasff', 'revenue', 'alerts', 'dashboard', 'team'],
-    zonal_coordinator: ['home', 'activity', 'facilities', 'log-complaints', 'log-adverts', 'log-meetings', 'log-rasff', 'revenue', 'alerts', 'dashboard', 'compliance', 'team'],
-    national_admin:    ['home', 'activity', 'facilities', 'log-complaints', 'log-adverts', 'log-meetings', 'log-rasff', 'revenue', 'alerts', 'dashboard', 'compliance', 'team'],
-    admin:             ['home', 'activity', 'facilities', 'log-complaints', 'log-adverts', 'log-meetings', 'log-rasff', 'revenue', 'alerts', 'dashboard', 'compliance', 'team']
+    pending:           ['home', 'profile'],
+    field_officer:     ['home', 'profile', 'activity', 'facilities', 'log-complaints', 'log-adverts', 'log-meetings', 'log-rasff', 'alerts'],
+    inspector:         ['home', 'profile', 'activity', 'facilities', 'log-complaints', 'alerts'],
+    state_coordinator: ['home', 'profile', 'activity', 'facilities', 'log-complaints', 'log-adverts', 'log-meetings', 'log-rasff', 'revenue', 'alerts', 'dashboard', 'team'],
+    zonal_coordinator: ['home', 'profile', 'activity', 'facilities', 'log-complaints', 'log-adverts', 'log-meetings', 'log-rasff', 'revenue', 'alerts', 'dashboard', 'compliance', 'team'],
+    national_admin:    ['home', 'profile', 'activity', 'facilities', 'log-complaints', 'log-adverts', 'log-meetings', 'log-rasff', 'revenue', 'alerts', 'dashboard', 'compliance', 'team'],
+    admin:             ['home', 'profile', 'activity', 'facilities', 'log-complaints', 'log-adverts', 'log-meetings', 'log-rasff', 'revenue', 'alerts', 'dashboard', 'compliance', 'team']
 };
 
 // ══════════════════════════════════════════════════════════════════
@@ -97,10 +101,11 @@ export const DAILY_ACTIVITIES = {
                 ]
             },
             {
-                trigger: { name: "alertProductFound", label: "Was any product on an active alert found?", type: "yesno" },
+                trigger: { name: "alertSurveillanceConducted", label: "Was alert surveillance conducted here?", type: "yesno" },
                 fields: [
+                    { name: "alertProductOutcome", label: "Outcome", type: "select", options: ["Checked - Not Found", "Alert Product Found / Received"] },
                     { name: "alertProduct", label: "Alert Product", type: "alertDropdown", placeholder: "Select from active alerts..." },
-                    { name: "alertProductDetails", label: "Details", type: "textarea", placeholder: "Describe the alert product(s) found..." }
+                    { name: "alertProductDetails", label: "Details / Action Taken", type: "textarea", placeholder: "Describe what was checked, found, received, mopped up, or escalated..." }
                 ]
             }
         ]
