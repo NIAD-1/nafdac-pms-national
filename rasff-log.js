@@ -8,6 +8,7 @@ import { db, collection, addDoc, getDocs, query, where, serverTimestamp } from "
 import { getUserScope } from "./auth.js";
 import { clearRoot, showToast, buildFormFields, initFormChoices } from "./ui.js";
 import { RASFF_FIELDS } from "./constants.js";
+import { escapeHtml } from "./ui.js";
 
 export async function loadRasffPage(root, currentUser, currentUserData) {
     clearRoot(root);
@@ -72,11 +73,11 @@ async function loadRasffList(container) {
                 <tbody>
                     ${entries.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).map(e => `
                     <tr style="border-top:1px solid var(--border-subtle);">
-                        <td style="padding:12px 16px; font-size:13px;">${e.dateOfCase || '—'}</td>
-                        <td style="padding:12px 16px; font-size:13px; font-weight:600;">${e.refNo || '—'}</td>
-                        <td style="padding:12px 16px; font-size:13px;">${e.notifyingCountry || '—'}</td>
-                        <td style="padding:12px 16px; font-size:13px;">${e.productType || '—'}</td>
-                        <td style="padding:12px 16px; font-size:13px;">${e.contaminant || '—'}</td>
+                        <td style="padding:12px 16px; font-size:13px;">${escapeHtml(e.dateOfCase || '—')}</td>
+                        <td style="padding:12px 16px; font-size:13px; font-weight:600;">${escapeHtml(e.refNo || '—')}</td>
+                        <td style="padding:12px 16px; font-size:13px;">${escapeHtml(e.notifyingCountry || '—')}</td>
+                        <td style="padding:12px 16px; font-size:13px;">${escapeHtml(e.productType || '—')}</td>
+                        <td style="padding:12px 16px; font-size:13px;">${escapeHtml(e.contaminant || '—')}</td>
                     </tr>`).join('')}
                 </tbody>
             </table>

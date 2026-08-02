@@ -7,6 +7,7 @@
 import { db, collection, getDocs, query, where, orderBy, limit } from "./db.js";
 import { showLoading } from "./ui.js";
 import { formatCurrency } from "./constants.js";
+import { escapeHtml } from "./ui.js";
 
 export async function loadFacilitiesPage(root, user, userData) {
     showLoading(root, 'Loading facilities...');
@@ -111,18 +112,18 @@ function renderFacilitiesList(root, facilities, userData) {
                 return `
                 <div class="facility-row animate-fade-in" data-id="${f.id}" style="cursor:pointer; display:flex; flex-direction:column; justify-content:space-between; border-radius:8px; border:1px solid var(--border-subtle); background:white; position:relative; overflow:hidden; transition:transform 0.2s; box-shadow:0 1px 3px rgba(0,0,0,0.04);">
                     <div style="padding:20px;">
-                        <h3 style="margin:0 0 8px 0; font-size:16px; font-weight:700; color:var(--text-primary); text-transform:uppercase;">${f.name || '—'}</h3>
+                        <h3 style="margin:0 0 8px 0; font-size:16px; font-weight:700; color:var(--text-primary); text-transform:uppercase;">${escapeHtml(f.name || '—')}</h3>
                         <span style="font-size:10px; padding:3px 8px; font-weight:800; border-radius:4px; margin-bottom:16px; display:inline-block; ${badgeStyle}">
                             ${badgeText}
                         </span>
                         <div style="font-size:13px; color:var(--text-secondary); margin-bottom:8px; display:flex; align-items:flex-start; gap:8px;">
-                            <span style="color:#d32f2f;">📍</span> <span style="line-height:1.4;">${f.address || '—'}, ${f.state || '—'}</span>
+                            <span style="color:#d32f2f;">📍</span> <span style="line-height:1.4;">${escapeHtml(f.address || '—')}, ${escapeHtml(f.state || '—')}</span>
                         </div>
                         <div style="font-size:13px; color:var(--text-secondary); margin-bottom:16px; display:flex; align-items:center; gap:8px;">
-                            <span style="opacity:0.5;">⏱</span> <span>Last Visit: ${f.lastVisitDate || '—'}</span>
+                            <span style="opacity:0.5;">⏱</span> <span>Last Visit: ${escapeHtml(f.lastVisitDate || '—')}</span>
                         </div>
                         <div style="display:flex; gap:6px; flex-wrap:wrap; min-height:22px;">
-                            ${showPill ? `<span style="background:#f1f8e9; color:#33691e; border:1px solid #dcedc8; font-size:10px; padding:4px 8px; border-radius:4px; font-weight:700;">${f.lastActivity.toUpperCase()}</span>` : ''}
+                            ${showPill ? `<span style="background:#f1f8e9; color:#33691e; border:1px solid #dcedc8; font-size:10px; padding:4px 8px; border-radius:4px; font-weight:700;">${escapeHtml(f.lastActivity).toUpperCase()}</span>` : ''}
                         </div>
                     </div>
                     <div style="border-top:1px solid var(--border-subtle); padding:16px 20px; display:flex; justify-content:space-between; align-items:center; background:#fafafa;">
@@ -175,7 +176,7 @@ export async function showFacilityProfile(facility) {
         const q = query(collection(db, 'facilityReports'), where('facilityName', '==', facility.name), limit(50));
         const snap = await getDocs(q);
         activities = snap.docs.map(d => d.data());
-    } catch (e) {}
+    } catch (e) { console.error('Query failed:', e); }
 
     // 2. Get Sanctions
     let sanctions = [];
@@ -183,7 +184,7 @@ export async function showFacilityProfile(facility) {
         const q = query(collection(db, 'sanctions'), where('facilityName', '==', facility.name), limit(50));
         const snap = await getDocs(q);
         sanctions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    } catch (e) {}
+    } catch (e) { console.error('Query failed:', e); }
 
     // 3. Get Complaints
     let complaints = [];
@@ -191,7 +192,7 @@ export async function showFacilityProfile(facility) {
         const q = query(collection(db, 'complaints'), where('facilityName', '==', facility.name), limit(50));
         const snap = await getDocs(q);
         complaints = snap.docs.map(d => d.data());
-    } catch (e) {}
+    } catch (e) { console.error('Query failed:', e); }
 
     // 4. Get Revenue
     let revenues = [];
@@ -199,7 +200,7 @@ export async function showFacilityProfile(facility) {
         const q = query(collection(db, 'revenue'), where('facilityName', '==', facility.name), limit(50));
         const snap = await getDocs(q);
         revenues = snap.docs.map(d => d.data());
-    } catch (e) {}
+    } catch (e) { console.error('Query failed:', e); }
 
     // Sort timelines
     activities.sort((a, b) => (b.inspectionDate || '').localeCompare(a.inspectionDate || ''));
@@ -210,10 +211,10 @@ export async function showFacilityProfile(facility) {
     const formatSancRevRows = (arr, isRev) => arr.length === 0 ? `<tr><td colspan="4" class="muted" style="text-align:center;padding:32px;">No financial records found.</td></tr>` : 
         arr.map(r => `
         <tr style="border-bottom:1px solid var(--border-subtle);">
-            <td style="padding:16px;">${(isRev?r.dateLogged:r.date) || '—'}</td>
-            <td style="padding:16px;">${r.activitySource || r.activityType || r.offence || '—'}</td>
+            <td style="padding:16px;">${escapeHtml((isRev?r.dateLogged:r.date) || '—')}</td>
+            <td style="padding:16px;">${escapeHtml(r.activitySource || r.activityType || r.offence || '—')}</td>
             <td style="padding:16px; font-weight:700;">${formatCurrency(isRev?r.amount:(r.amount||0))}</td>
-            <td style="padding:16px;"><span class="badge ${r.paymentStatus==='Paid'||r.status==='Paid' ? 'badge-green' : 'badge-red'}">${r.paymentStatus||r.status||'Outstanding'}</span></td>
+            <td style="padding:16px;"><span class="badge ${r.paymentStatus==='Paid'||r.status==='Paid' ? 'badge-green' : 'badge-red'}">${escapeHtml(r.paymentStatus||r.status||'Outstanding')}</span></td>
         </tr>
     `).join('');
 
@@ -231,27 +232,26 @@ export async function showFacilityProfile(facility) {
     const histRows = activities.length === 0 ? `<tr><td colspan="4" class="muted" style="text-align:center;padding:32px;">No recorded inspections yet.</td></tr>` : 
         activities.map(a => `
         <tr style="border-bottom:1px solid var(--border-subtle);">
-            <td style="padding:16px;">${a.inspectionDate || '—'}</td>
-            <td style="padding:16px;"><span style="background:#e3f2fd; color:#1565c0; padding:4px 8px; border-radius:4px; font-size:11px; font-weight:700;">${a.activityType || '—'}</span></td>
-            <td style="padding:16px;">${a.state || '—'}</td>
-            <td style="padding:16px;">${a.createdByName || '—'}</td>
+            <td style="padding:16px;">${escapeHtml(a.inspectionDate || '—')}</td>
+            <td style="padding:16px;"><span style="background:#e3f2fd; color:#1565c0; padding:4px 8px; border-radius:4px; font-size:11px; font-weight:700;">${escapeHtml(a.activityType || '—')}</span></td>
+            <td style="padding:16px;">${escapeHtml(a.state || '—')}</td>
+            <td style="padding:16px;">${escapeHtml(a.createdByName || '—')}</td>
         </tr>
     `).join('');
     
     const compRows = complaints.length === 0 ? `<tr><td colspan="3" class="muted" style="text-align:center;padding:32px;">No consumer complaints on file.</td></tr>` : 
         complaints.map(c => `
         <tr style="border-bottom:1px solid var(--border-subtle);">
-            <td style="padding:16px;">${c.dateLogged || '—'}</td>
-            <td style="padding:16px;">${c.productName || '—'}</td>
-            <td style="padding:16px;">${c.status || '—'}</td>
+            <td style="padding:16px;">${escapeHtml(c.dateLogged || '—')}</td>
+            <td style="padding:16px;">${escapeHtml(c.productName || '—')}</td>
+            <td style="padding:16px;">${escapeHtml(c.status || '—')}</td>
         </tr>
     `).join('');
 
     const tabHTML = {
         'history': renderTable(['DATE', 'ACTIVITY TYPE', 'STATE LOCATION', 'LEAD OFFICER'], histRows),
         'sanctions': renderTable(['ISSUE DATE', 'ORIGIN ACTIVITY / OFFENCE', 'AMOUNT', 'STATUS'], formatSancRevRows([...sanctions, ...revenues].sort((a,b)=>((b.date||b.dateLogged||'').localeCompare(a.date||a.dateLogged||''))), false)),
-        'complaints': renderTable(['DATE REPORTED', 'PRODUCT IMPLICATED', 'STATUS'], compRows),
-        'other': `<div style="text-align:center; padding:60px; background:white; border-radius:8px; border:1px solid var(--border-subtle);"><span style="font-size:40px;">🚧</span><h3 style="margin-top:16px;">Module In Development</h3><p class="muted">This specific tab acts as a placeholder for Phase 14.</p></div>`
+        'complaints': renderTable(['DATE REPORTED', 'PRODUCT IMPLICATED', 'STATUS'], compRows)
     };
 
     const outsdBg = facility.totalOwed > 0 ? '#ffebee' : '#f5f5f5';
@@ -273,7 +273,7 @@ export async function showFacilityProfile(facility) {
             <span style="font-size:24px; padding:12px; background:${riskBg}; border-radius:8px;">${riskIcon}</span>
             <div style="text-align:right;">
                 <div style="color:var(--text-secondary); font-size:11px; font-weight:800; letter-spacing:0.5px; margin-bottom:8px;">RISK RATING</div>
-                <div style="font-size:18px; font-weight:800; color:${riskColor};">${latestRisk.toUpperCase()}</div>
+                <div style="font-size:18px; font-weight:800; color:${riskColor};">${escapeHtml(latestRisk).toUpperCase()}</div>
             </div>
         </div>`;
     }
@@ -286,21 +286,18 @@ export async function showFacilityProfile(facility) {
 
         <div style="background:white; border:1px solid var(--border-subtle); border-radius:12px; padding:32px; margin-bottom:24px; display:flex; justify-content:space-between; align-items:flex-start; box-shadow:0 2px 4px rgba(0,0,0,0.02);">
             <div>
-                <h1 style="color:var(--text-primary); margin:0 0 12px 0; font-size:28px; text-transform:uppercase;">${facility.name}</h1>
+                <h1 style="color:var(--text-primary); margin:0 0 12px 0; font-size:28px; text-transform:uppercase;">${escapeHtml(facility.name || '')}</h1>
                 <div style="display:flex; align-items:center; gap:8px; color:var(--text-secondary); margin-bottom:16px; font-size:15px;">
-                    <span style="opacity:0.5;">📍</span> ${facility.address || '—'}
+                    <span style="opacity:0.5;">📍</span> ${escapeHtml(facility.address || '—')}
                 </div>
                 <div style="display:flex; align-items:center; gap:16px; color:var(--text-secondary); font-size:13px; font-weight:500;">
-                    <div><span style="opacity:0.5; margin-right:4px;">⏱</span> LAST VISITED: ${facility.lastVisitDate ? facility.lastVisitDate.split('-')[0] : '—'}</div>
+                    <div><span style="opacity:0.5; margin-right:4px;">⏱</span> LAST VISITED: ${escapeHtml(facility.lastVisitDate ? facility.lastVisitDate.split('-')[0] : '—')}</div>
                 </div>
             </div>
             <div style="display:flex; flex-direction:column; align-items:flex-end; gap:16px;">
                 <span style="padding:6px 16px; font-size:12px; font-weight:800; letter-spacing:1px; border-radius:4px; ${facility.totalOwed > 0 ? 'background:#ffebee; color:#c62828;' : 'background:#e8f5e9; color:#2e7d32;'}">
                     ${facility.totalOwed > 0 ? 'PENDING' : 'ACTIVE'}
                 </span>
-                <button class="secondary" style="font-weight:600; display:flex; align-items:center; gap:8px; padding:8px 16px;">
-                    <span>✏️</span> EDIT PROFILE
-                </button>
             </div>
         </div>
 
@@ -331,7 +328,7 @@ export async function showFacilityProfile(facility) {
                 <span style="font-size:24px; padding:12px; background:#f5f5f5; border-radius:8px;">📅</span>
                 <div style="text-align:right;">
                     <div style="color:var(--text-secondary); font-size:11px; font-weight:800; letter-spacing:0.5px; margin-bottom:8px;">LAST VISIT</div>
-                    <div style="font-size:16px; font-weight:700; margin-top:8px;">${facility.lastVisitDate || '—'}</div>
+                    <div style="font-size:16px; font-weight:700; margin-top:8px;">${escapeHtml(facility.lastVisitDate || '—')}</div>
                 </div>
             </div>
         </div>
@@ -340,9 +337,6 @@ export async function showFacilityProfile(facility) {
             <button class="prof-tab active" data-tab="history" style="background:transparent; border:none; padding:12px 0; font-size:14px; font-weight:700; color:var(--primary); border-bottom:3px solid var(--primary); cursor:pointer;">Inspection History</button>
             <button class="prof-tab" data-tab="sanctions" style="background:transparent; border:none; padding:12px 0; font-size:14px; font-weight:600; color:var(--text-secondary); border-bottom:3px solid transparent; cursor:pointer;">Sanctions & Fines</button>
             <button class="prof-tab" data-tab="complaints" style="background:transparent; border:none; padding:12px 0; font-size:14px; font-weight:600; color:var(--text-secondary); border-bottom:3px solid transparent; cursor:pointer;">Consumer Complaints</button>
-            <button class="prof-tab" data-tab="other" style="background:transparent; border:none; padding:12px 0; font-size:14px; font-weight:600; color:var(--text-secondary); border-bottom:3px solid transparent; cursor:pointer;">Documents</button>
-            <button class="prof-tab" data-tab="other" style="background:transparent; border:none; padding:12px 0; font-size:14px; font-weight:600; color:var(--text-secondary); border-bottom:3px solid transparent; cursor:pointer;">File Registry</button>
-            <button class="prof-tab" data-tab="other" style="background:transparent; border:none; padding:12px 0; font-size:14px; font-weight:600; color:var(--text-secondary); border-bottom:3px solid transparent; cursor:pointer;">Branches</button>
         </div>
 
         <div id="profTabContent">

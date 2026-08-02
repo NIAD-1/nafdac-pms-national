@@ -7,6 +7,7 @@ import { db, collection, addDoc, getDocs, query, where, serverTimestamp } from "
 import { getUserScope } from "./auth.js";
 import { clearRoot, showToast, buildFormFields } from "./ui.js";
 import { MEETING_FIELDS, QMS_FIELDS } from "./constants.js";
+import { escapeHtml } from "./ui.js";
 
 export async function loadMeetingsPage(root, currentUser, currentUserData) {
     clearRoot(root);
@@ -78,10 +79,10 @@ async function loadMeetingsList(container, currentUser, currentUserData) {
                     <tbody>
                         ${entries.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).map(e => `
                         <tr style="border-top:1px solid var(--border-subtle);">
-                            <td style="padding:12px 16px; font-size:13px;">${e.meetingDate || '—'}</td>
-                            <td style="padding:12px 16px; font-size:13px; font-weight:600;">${e.title || '—'}</td>
-                            <td style="padding:12px 16px; font-size:13px;">${e.venue || '—'}</td>
-                            <td style="padding:12px 16px; font-size:13px;">${e.facilitator || '—'}</td>
+                            <td style="padding:12px 16px; font-size:13px;">${escapeHtml(e.meetingDate || '—')}</td>
+                            <td style="padding:12px 16px; font-size:13px; font-weight:600;">${escapeHtml(e.title || '—')}</td>
+                            <td style="padding:12px 16px; font-size:13px;">${escapeHtml(e.venue || '—')}</td>
+                            <td style="padding:12px 16px; font-size:13px;">${escapeHtml(e.facilitator || '—')}</td>
                         </tr>`).join('')}
                     </tbody>
                 </table>
@@ -175,9 +176,9 @@ async function loadQmsList(container, currentUser, currentUserData) {
                     <tbody>
                         ${entries.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).map(e => `
                         <tr style="border-top:1px solid var(--border-subtle);">
-                            <td style="padding:12px 16px; font-size:13px;">${e.qmsDate || '—'}</td>
-                            <td style="padding:12px 16px; font-size:13px;">${(e.qmsActivity || '—').substring(0, 80)}${e.qmsActivity?.length > 80 ? '...' : ''}</td>
-                            <td style="padding:12px 16px; font-size:13px;">${e.createdByName || '—'}</td>
+                            <td style="padding:12px 16px; font-size:13px;">${escapeHtml(e.qmsDate || '—')}</td>
+                            <td style="padding:12px 16px; font-size:13px;">${escapeHtml((e.qmsActivity || '—').substring(0, 80))}${e.qmsActivity?.length > 80 ? '...' : ''}</td>
+                            <td style="padding:12px 16px; font-size:13px;">${escapeHtml(e.createdByName || '—')}</td>
                         </tr>`).join('')}
                     </tbody>
                 </table>

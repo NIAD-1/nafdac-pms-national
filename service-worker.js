@@ -1,7 +1,7 @@
 importScripts('https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging-compat.js');
 
-const CACHE_NAME = 'nafdac-pms-v7';
+const CACHE_NAME = 'nafdac-pms-v8';
 const firebaseConfig = {
   apiKey: "AIzaSyC98TWcj1lzG4MtOYpDGt3MxISC5JNW2Yk",
   authDomain: "pms-national.firebaseapp.com",
@@ -44,6 +44,14 @@ const urlsToCache = [
   '/facilities.js',
   '/complaints.js',
   '/particles.js',
+  '/audit.js',
+  '/revenue.js',
+  '/meetings-qms.js',
+  '/adverts-log.js',
+  '/rasff-log.js',
+  '/alerts.js',
+  '/lga-data.js',
+  '/local-config.js',
   '/manifest.json',
   '/logo.png',
   // External CDNs cached for offline reliability

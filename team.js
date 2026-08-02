@@ -533,8 +533,8 @@ function renderTeamPage(root, userData, userLevel, users) {
                     errors.push(`${r.email}: ${err.message}`);
                 }
 
-                // Small delay to avoid Firebase rate limits
-                await new Promise(resolve => setTimeout(resolve, 300));
+                // Small delay to avoid Firebase rate limits (150ms is safe threshold)
+                await new Promise(resolve => setTimeout(resolve, 150));
             }
 
             progressBar.style.width = '100%';

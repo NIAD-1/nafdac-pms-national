@@ -66,6 +66,21 @@ export function showModal(title, bodyHtml, onConfirm, confirmText = 'Confirm') {
     }
 }
 
+/** Promise-based confirmation dialog for destructive actions */
+export function showConfirm(title, message, confirmText = 'Confirm') {
+    return new Promise((resolve) => {
+        showModal(title, `<p style="color:var(--text-secondary); line-height:1.7;">${message}</p>`, () => resolve(true), confirmText);
+        // Override cancel to resolve false
+        const cancelBtn = document.getElementById('modalCancelBtn');
+        const closeBtn = document.getElementById('modalClose');
+        const overlay = document.getElementById('modalOverlay');
+        const rejectAndClose = () => { document.getElementById('modalContainer').innerHTML = ''; resolve(false); };
+        if (cancelBtn) cancelBtn.onclick = rejectAndClose;
+        if (closeBtn) closeBtn.onclick = rejectAndClose;
+        if (overlay) overlay.onclick = (e) => { if (e.target.id === 'modalOverlay') rejectAndClose(); };
+    });
+}
+
 // === LOADING (Skeleton Placeholders) =============================
 export function showLoading(root, msg = 'Loading...') {
     root.innerHTML = `

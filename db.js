@@ -141,4 +141,23 @@ export async function prefetchStateRegistry(state) {
     }
 }
 
+// ── Shared Scoped Query Builder (eliminates 9x duplication) ─────
+/**
+ * Builds a Firestore query filtered by user scope (state, zone, or national).
+ * @param {string} collectionName - Firestore collection to query
+ * @param {object} scope - { state, zone } from getUserScope()
+ * @param {Array} extraConstraints - Additional where/orderBy/limit constraints
+ * @returns {Query} Firestore query
+ */
+export function buildScopedQuery(collectionName, scope, extraConstraints = []) {
+    const constraints = [];
+    if (scope.state) {
+        constraints.push(where('state', '==', scope.state));
+    } else if (scope.zone) {
+        constraints.push(where('zone', '==', scope.zone));
+    }
+    constraints.push(...extraConstraints);
+    return query(collection(db, collectionName), ...constraints);
+}
+
 export { db, auth, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, collection, getDocs, query, where, orderBy, Timestamp, limit, runTransaction, increment };

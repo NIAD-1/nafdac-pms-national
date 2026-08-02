@@ -8,6 +8,7 @@ import { db, collection, addDoc, getDocs, query, where, serverTimestamp } from "
 import { getUserScope } from "./auth.js";
 import { clearRoot, showToast, buildFormFields, initFormChoices } from "./ui.js";
 import { ADVERT_FIELDS, getTodayStr } from "./constants.js";
+import { escapeHtml } from "./ui.js";
 
 export async function loadAdvertsPage(root, currentUser, currentUserData) {
     clearRoot(root);
@@ -76,10 +77,10 @@ async function loadAdvertsList(container, userData) {
                 <tbody>
                     ${adverts.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).map(a => `
                     <tr style="border-top:1px solid var(--border-subtle);">
-                        <td style="padding:12px 16px; font-size:13px;">${a.dateLogged || '—'}</td>
-                        <td style="padding:12px 16px; font-size:13px; font-weight:600;">${a.companyName || '—'}</td>
-                        <td style="padding:12px 16px; font-size:13px;">${a.productName || '—'}</td>
-                        <td style="padding:12px 16px; font-size:13px;">${a.adType || '—'}</td>
+                        <td style="padding:12px 16px; font-size:13px;">${escapeHtml(a.dateLogged || '—')}</td>
+                        <td style="padding:12px 16px; font-size:13px; font-weight:600;">${escapeHtml(a.companyName || '—')}</td>
+                        <td style="padding:12px 16px; font-size:13px;">${escapeHtml(a.productName || '—')}</td>
+                        <td style="padding:12px 16px; font-size:13px;">${escapeHtml(a.adType || '—')}</td>
                         <td style="padding:12px 16px; font-size:13px;">${a.violations ? '<span class="badge badge-red">Yes</span>' : '<span class="badge badge-green">None</span>'}</td>
                     </tr>`).join('')}
                 </tbody>

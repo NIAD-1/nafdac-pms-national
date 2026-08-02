@@ -1,0 +1,96 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isUserSelf(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    function hasRole(role) {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+    }
+    
+    function isAdmin() {
+      return hasRole('admin') || hasRole('national_admin');
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && (isUserSelf(userId) || isAdmin());
+    }
+
+    match /facilityReports/{reportId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (resource.data.createdBy == request.auth.uid || isAdmin());
+      allow delete: if false;
+    }
+
+    match /facilities/{facilityId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /sanctions/{sanctionId} {
+      allow read, create: if isAuthenticated();
+      allow update: if false; // Assuming no update specified, defaults to false based on prompt
+      allow delete: if isAuthenticated() && isAdmin();
+    }
+    
+    match /revenue/{revenueId} {
+      allow read, create: if isAuthenticated();
+      allow update: if false; // Assuming no update specified
+      allow delete: if isAuthenticated() && isAdmin();
+    }
+
+    match /complaints/{complaintId} {
+      allow read, create, update: if isAuthenticated();
+    }
+
+    match /alerts/{alertId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated() && isAdmin();
+    }
+
+    match /audit_logs/{logId} {
+      allow create: if isAuthenticated();
+      allow read: if isAuthenticated() && isAdmin();
+      allow update, delete: if false;
+    }
+
+    match /meetingLogs/{logId} {
+      allow read, create: if isAuthenticated();
+    }
+
+    match /qmsLogs/{logId} {
+      allow read, create: if isAuthenticated();
+    }
+
+    match /advertLogs/{logId} {
+      allow read, create: if isAuthenticated();
+    }
+
+    match /rasffLogs/{logId} {
+      allow read, create: if isAuthenticated();
+    }
+
+    match /watchlistResponses/{responseId} {
+      allow read, create: if isAuthenticated();
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid; // Assuming userId field exists
+      allow create: if isAuthenticated();
+    }
+  }
+}

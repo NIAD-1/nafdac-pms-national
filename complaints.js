@@ -225,6 +225,7 @@ function renderComplaintForm(container, currentUser, currentUserData) {
 }
 
 function renderUpdateForm(container, complaint, scope = getUserScope()) {
+    const safeUrl = (complaint.responseDocumentUrl || '').startsWith('http') ? escapeHtml(complaint.responseDocumentUrl) : '#';
     container.innerHTML = `
     <div class="card animate-fade-in">
         <h2 style="margin-bottom: 4px;">✏️ Update Complaint</h2>
@@ -260,7 +261,7 @@ function renderUpdateForm(container, complaint, scope = getUserScope()) {
             <label style="color:var(--primary); font-weight:700;">Remarks</label>
             <textarea name="remarks" rows="2">${escapeHtml(complaint.remarks || '')}</textarea>
         </div>
-        ${complaint.responseDocumentUrl ? `<div class="complaint-response-link"><span>Current response document</span><a href="${escapeHtml(complaint.responseDocumentUrl)}" target="_blank" rel="noopener">Open Document</a></div>` : ''}
+        ${complaint.responseDocumentUrl ? `<div class="complaint-response-link"><span>Current response document</span><a href="${safeUrl}" target="_blank" rel="noopener">Open Document</a></div>` : ''}
         <div class="controls" style="justify-content: flex-end; margin-top: 20px; gap: 12px;">
             <button class="secondary" id="cancelUpdate">Cancel</button>
             <button class="success" id="saveUpdate">💾 Save Update</button>

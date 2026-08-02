@@ -4,7 +4,7 @@
  */
 import { db, collection, addDoc, getDocs, query, where, serverTimestamp, doc, updateDoc } from "./db.js";
 import { getUserScope } from "./auth.js";
-import { clearRoot, showToast, buildFormFields, initFormChoices, escapeHtml } from "./ui.js";
+import { clearRoot, showToast, buildFormFields, initFormChoices, escapeHtml, showConfirm } from "./ui.js";
 import { ALL_STATES, ROLES } from "./constants.js";
 import { triggerServerPush } from "./server-push.js";
 
@@ -132,6 +132,9 @@ async function loadWatchlistDashboard(container, currentUserData) {
 
         container.querySelectorAll('[data-watchlist-approve]').forEach(btn => {
             btn.addEventListener('click', async () => {
+                const confirmed = await showConfirm('Approve Watchlist Item', 'This will broadcast this alert to all officers nationwide. Are you sure?', '✅ Approve & Broadcast');
+                if (!confirmed) return;
+                btn.disabled = true; btn.textContent = 'Approving...';
                 const watchlistId = btn.dataset.watchlistApprove;
                 await updateDoc(doc(db, 'alerts', btn.dataset.watchlistApprove), {
                     approvalStatus: 'approved',
@@ -150,6 +153,9 @@ async function loadWatchlistDashboard(container, currentUserData) {
 
         container.querySelectorAll('[data-watchlist-close]').forEach(btn => {
             btn.addEventListener('click', async () => {
+                const confirmed = await showConfirm('Close Watchlist Item', 'This will permanently close this alert. Officers will no longer see it. Continue?', '🔒 Close Item');
+                if (!confirmed) return;
+                btn.disabled = true; btn.textContent = 'Closing...';
                 await updateDoc(doc(db, 'alerts', btn.dataset.watchlistClose), {
                     status: 'closed',
                     closedBy: currentUserData?.displayName || currentUserData?.email || 'Officer',
