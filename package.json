@@ -2,7 +2,15 @@
   "name": "nafdac-pms",
   "private": true,
   "version": "1.0.0",
+  "scripts": {
+    "dev": "npx vite",
+    "build": "npx vite build",
+    "preview": "npx vite preview"
+  },
   "dependencies": {
     "firebase-admin": "^12.7.0"
+  },
+  "devDependencies": {
+    "vite": "^5.4.21"
   }
 }
