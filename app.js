@@ -470,25 +470,57 @@ if (pwChangeForm) {
 
 document.getElementById('btnPwChangeSignOut')?.addEventListener('click', logOut);
 
-// ── Mobile Sidebar Toggle ───────────────────────────────────────
+// ── Mobile Sidebar Toggle & Gesture UX ───────────────────────────
 const sidebar = document.getElementById('sidebar');
 const toggle = document.getElementById('sidebarToggle');
+const sidebarClose = document.getElementById('sidebarClose');
 const overlay = document.getElementById('sidebarOverlay');
+
+function openSidebar() {
+    if (sidebar) sidebar.classList.add('open');
+    if (overlay) overlay.classList.add('active');
+    document.body.style.overflow = 'hidden'; // Lock background scroll on mobile
+}
 
 function closeSidebar() {
     if (sidebar) sidebar.classList.remove('open');
     if (overlay) overlay.classList.remove('active');
+    document.body.style.overflow = ''; // Restore background scroll
 }
 
-if (toggle && sidebar) {
+if (toggle) {
     toggle.onclick = () => {
-        sidebar.classList.toggle('open');
-        if (overlay) overlay.classList.toggle('active');
+        if (sidebar?.classList.contains('open')) {
+            closeSidebar();
+        } else {
+            openSidebar();
+        }
     };
 }
-if (overlay) {
-    overlay.onclick = closeSidebar;
-}
+
+if (sidebarClose) sidebarClose.onclick = closeSidebar;
+if (overlay) overlay.onclick = closeSidebar;
+
+// Close on Escape key press
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && sidebar?.classList.contains('open')) {
+        closeSidebar();
+    }
+});
+
+// Swipe-left gesture on sidebar to close on mobile
+let touchStartX = 0;
+sidebar?.addEventListener('touchstart', (e) => {
+    touchStartX = e.touches[0].clientX;
+}, { passive: true });
+
+sidebar?.addEventListener('touchend', (e) => {
+    const touchEndX = e.changedTouches[0].clientX;
+    // Swipe left (move > 50px to the left)
+    if (touchStartX - touchEndX > 50) {
+        closeSidebar();
+    }
+}, { passive: true });
 
 // ── SCREEN MANAGEMENT ───────────────────────────────────────────
 const passwordChangeScreen = document.getElementById('passwordChangeScreen');
